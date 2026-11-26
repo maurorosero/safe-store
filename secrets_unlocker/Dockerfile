@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 """Entrega la master key de Safe Store al core, por HTTP local y con token.
 
 No expone nada fuera de la red interna de los add-ons: el token lo genera el

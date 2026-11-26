@@ -16,7 +16,7 @@ master key.
 
 ## 2. Reglas que no se negocian
 
-1. **Cabecera SPDX** (`# SPDX-License-Identifier: GPL-3.0-or-later`) en cada
+1. **Cabecera SPDX** (`# SPDX-License-Identifier: MIT`) en cada
    archivo propio: `.py`, `.sh`, `.yaml`, `Makefile` ya no existe, workflows.
 2. **DCO**: todo commit con `git commit -s`.
 3. **Fragmento de changelog** en `.changes/unreleased/` por cada cambio.

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # Ciclo de desarrollo de una integración de Home Assistant: no hay binarios que
 # compilar. Lo que se valida es que la integración cumpla el contrato de HA
 # (hassfest), que sea instalable por el Marketplace (HACS action) y que el

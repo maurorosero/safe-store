@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # Fragmentos de changelog por cambio, sección por release.
 #   check          informa fragmentos pendientes (no bloquea)
 #   prepare <ver>  arma la sección en CHANGELOG.md y archiva los fragmentos

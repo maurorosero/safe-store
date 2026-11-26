@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # Todo commit del rango tiene que llevar Signed-off-by.
 set -eu
 base="${1:-origin/main}"
