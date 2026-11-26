@@ -25,4 +25,4 @@ RUN apk add --no-cache python3 curl \
     && python3 --version && sops --version && age --version
 
 COPY server.py /server.py
-CMD ["python3", "-u", "/server.py"]
+CMD ["/usr/bin/python3", "-u", "/server.py"]
