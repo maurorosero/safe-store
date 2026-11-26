@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import secrets
 from typing import Any
 
 import aiohttp
@@ -41,16 +42,21 @@ _aes: AESGCM | None = None
 # --------------------------------------------------------------------------- #
 # Obtención de la master key
 # --------------------------------------------------------------------------- #
+def _leer_o_crear_token() -> str:
+    """Token compartido con el add-on. Se crea la primera vez, con 600."""
+    if TOKEN_FILE.exists():
+        return TOKEN_FILE.read_text().strip()
+    token = secrets.token_hex(32)
+    TOKEN_FILE.write_text(token)
+    os.chmod(TOKEN_FILE, 0o600)
+    _LOGGER.warning("safe_store: token del add-on creado en %s", TOKEN_FILE)
+    return token
+
+
 async def _clave_desde_addon(hass: HomeAssistant) -> bytes | None:
     """Pide la master key al add-on. Devuelve None si no está disponible."""
-    if not TOKEN_FILE.exists():
-        return None
-
-    def _leer_token() -> str:
-        return TOKEN_FILE.read_text().strip()
-
     try:
-        token = await hass.async_add_executor_job(_leer_token)
+        token = await hass.async_add_executor_job(_leer_o_crear_token)
         timeout = aiohttp.ClientTimeout(total=ADDON_TIMEOUT)
         async with (
             aiohttp.ClientSession(timeout=timeout) as sesion,
