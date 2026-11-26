@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+.ss.key
+.ss.token
+.ss_dump.json

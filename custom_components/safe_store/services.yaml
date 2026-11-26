@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+dump:
+  name: Volcar en claro
+  description: >-
+    Escribe todas las credenciales descifradas en /config/.ss_dump.json con
+    permisos 600. Es la salida de emergencia antes de desinstalar Safe Store.

@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Safe Store Unlocker
+version: "0.1.0"
+slug: secrets_unlocker
+description: Entrega la master key de Safe Store al core por HTTP local
+url: https://github.com/maurorosero/safe-store
+arch:
+  - amd64
+  - aarch64
+startup: initialize
+boot: auto
+init: false
+map:
+  - type: homeassistant_config
+    read_only: true
+backup: cold
+backup_exclude:
+  - master.key
+  - age.key
+options: {}
+schema: {}

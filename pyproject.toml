@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+[project]
+name = "safe-store"
+version = "0.1.0"
+description = "Cifrado en reposo de las credenciales de Home Assistant"
+requires-python = ">=3.12"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "N"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Safe Store",
+        "description": "Cifra en reposo las credenciales de tus integraciones."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Safe Store ya está configurado."
+    }
+  },
+  "services": {
+    "dump": {
+      "name": "Volcar en claro",
+      "description": "Escribe las credenciales descifradas en /config/.ss_dump.json. Obligatorio antes de desinstalar."
+    }
+  }
+}

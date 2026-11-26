@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+build_from:
+  amd64: python:3.12-alpine
+  aarch64: python:3.12-alpine

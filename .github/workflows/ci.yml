@@ -1,0 +1,129 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Ciclo de desarrollo de una integración de Home Assistant: no hay binarios que
+# compilar. Lo que se valida es que la integración cumpla el contrato de HA
+# (hassfest), que sea instalable por el Marketplace (HACS action) y que el
+# add-on construya. La distribución va por tag, no por artefactos compilados.
+name: CI
+
+on:
+  pull_request:
+    branches: [main, devs]
+  push:
+    branches: [main, devs]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  calidad:
+    name: calidad
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: dependencias
+        run: pip install -r requirements_test.txt
+      - name: ruff
+        run: |
+          ruff check custom_components tests
+          ruff format --check custom_components tests
+      - name: pytest
+        run: pytest -q tests
+      - name: cabecera SPDX
+        run: tools/hooks/spdx.sh
+      - name: la versión del manifest es la del cambio
+        run: |
+          python - <<'PY'
+          import json, pathlib, re
+          manifest = json.loads(pathlib.Path("custom_components/safe_store/manifest.json").read_text())
+          version = manifest["version"]
+          assert re.fullmatch(r"\d+\.\d+\.\d+", version), version
+          print("manifest version:", version)
+          PY
+
+  hassfest:
+    name: hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  marketplace:
+    name: marketplace
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+          ignore: brands
+
+  addon:
+    name: add-on
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: construye la imagen
+        uses: docker/build-push-action@v6
+        with:
+          context: secrets_unlocker
+          platforms: linux/amd64
+          push: false
+          tags: safe-store-unlocker:ci
+      - name: el add-on declara lo que el Supervisor exige
+        run: |
+          python - <<'PY'
+          import pathlib, re
+          cfg = pathlib.Path("secrets_unlocker/config.yaml").read_text()
+          for clave in ("name:", "version:", "slug:", "arch:", "startup:"):
+              assert clave in cfg, f"falta {clave}"
+          print("config.yaml: obligatorios presentes")
+          PY
+
+  secretos:
+    name: secretos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: instalar gitleaks
+        run: |
+          VER=8.24.3
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" \
+            | tar -xz -C "${RUNNER_TEMP}" gitleaks
+      - name: escanear el historial
+        run: '"${RUNNER_TEMP}/gitleaks" detect --redact --verbose --no-banner --source .'
+
+  dco:
+    name: DCO
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: firmas en los commits
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          tools/hooks/dco.sh "origin/${{ github.base_ref }}"
+
+  changelog:
+    name: changelog
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: fragmentos
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          tools/changelog.sh check
