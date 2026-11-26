@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.5] - 2026-11-26
+
+- El add-on se declara como servicio s6, que es como arranca la base de Home Assistant
+
 ## [0.2.4] - 2026-11-26
 
 - El add-on arranca con la ruta absoluta de python3, que s6 no resuelve por PATH

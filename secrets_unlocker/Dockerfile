@@ -25,4 +25,14 @@ RUN apk add --no-cache python3 curl \
     && python3 --version && sops --version && age --version
 
 COPY server.py /server.py
-CMD ["/usr/bin/python3", "-u", "/server.py"]
+
+# La base de Home Assistant arranca con s6-overlay: un CMD suelto no se ejecuta.
+# El servicio se declara como longrun para que s6 lo levante y lo vigile.
+RUN mkdir -p /etc/s6-overlay/s6-rc.d/unlocker/dependencies.d \
+    && echo longrun > /etc/s6-overlay/s6-rc.d/unlocker/type \
+    && printf '#!/usr/bin/with-contenv sh\nexec /usr/bin/python3 -u /server.py\n' \
+         > /etc/s6-overlay/s6-rc.d/unlocker/run \
+    && chmod +x /etc/s6-overlay/s6-rc.d/unlocker/run \
+    && touch /etc/s6-overlay/s6-rc.d/unlocker/dependencies.d/base \
+    && mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d \
+    && touch /etc/s6-overlay/s6-rc.d/user/contents.d/unlocker
