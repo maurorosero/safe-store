@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: MIT
-ARG BUILD_FROM
+# El Supervisor no siempre pasa BUILD_FROM: el default cubre el build local en
+# amd64, y build.yaml / el CI pasan la base correcta por arquitectura.
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
 FROM ${BUILD_FROM}
 
-ARG TARGETARCH
+ARG TARGETARCH=amd64
 ARG SOPS_VERSION=3.9.4
 ARG AGE_VERSION=1.2.0
 

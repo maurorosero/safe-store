@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.3] - 2026-11-26
+
+- El Dockerfile del add-on define una base por defecto cuando el Supervisor no pasa BUILD_FROM
+
 ## [0.2.2] - 2026-11-26
 
 - El add-on construye sobre la base de Home Assistant e instala python3 con apk
