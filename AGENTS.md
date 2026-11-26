@@ -1,146 +1,159 @@
-# AGENTS.md — instrucciones para agentes en este repositorio
+# AGENTS.md
 
-Actuás como **desarrollador senior de Python e integraciones de Home Assistant**.
-Escribís código idiomático, lo probás antes de decir que funciona, y no inventás
-comportamiento de HA, APIs ni resultados de comandos. Si no lo podés verificar,
-lo decís con esas palabras.
+Guía para agentes de IA que trabajen en este repositorio. Complementa el
+`README.md` (para humanos) con lo que un agente necesita para no equivocarse:
+comandos, convenciones y el ciclo de desarrollo.
 
-Idioma: **código, docstrings y comentarios en inglés**; este documento y la
-conversación, en español.
+## Project
 
-Las reglas de abajo no son sugerencias. Si un pedido choca con una, señalá el
-choque antes de escribir código.
+Integración de Home Assistant (`custom_components/safe_store`) más el add-on que
+la acompaña (`secrets_unlocker`). La integración cifra en reposo el campo `data`
+de `core.config_entries`; el add-on entrega la master key por HTTP local.
 
----
+Licencia MIT. Código y docstrings en inglés; este documento y los PR en español.
 
-## 1. Qué es este proyecto
-
-Una integración de Home Assistant (`custom_components/safe_store`) y el add-on
-que la acompaña (`secrets_unlocker`). La integración cifra en reposo el campo
-`data` de `core.config_entries`; el add-on entrega la master key.
-
-## 2. Python 3
-
-### Estilo y tipado
-
-- PEP 8 con `line-length = 100`, `target-version = py312`. Lo impone `ruff`.
-- **Type hints en toda función pública**, incluido el retorno. `-> None` también.
-- `from __future__ import annotations` como primera línea después del docstring.
-- En firmas, `Mapping`/`Sequence` de `collections.abc`, no `dict`/`list`, salvo
-  que se mute el argumento.
-- `Any` solo donde el tipo es genuinamente desconocido; si aparece tres veces
-  en un módulo, el diseño está mal.
-- `pathlib.Path` para rutas. `os.path` no.
-- f-strings para construir texto; en `logging`, placeholders `%s` con argumentos.
-
-### Async
-
-- Todo I/O va por `async`. Si algo es bloqueante, `await hass.async_add_executor_job(...)`.
-  **Nunca** `open()`, `requests`, `subprocess` ni `time.sleep` en el event loop.
-- `aiohttp` con `ClientTimeout` explícito. Ninguna llamada de red sin timeout.
-- Un `except` que envuelve I/O tiene que loguear y devolver un resultado
-  explícito (`None`), no propagar un error genérico.
-
-### Errores
-
-- Excepciones específicas. `except Exception` solo en un borde documentado, con
-  `# noqa: BLE001` y un comentario que diga por qué no se puede ser más preciso.
-- No se silencia un error sin dejar rastro: `_LOGGER.exception` como mínimo.
-- En setup, `ConfigEntryNotReady` si el fallo es transitorio y reintentable;
-  `ConfigEntryAuthFailed` si es de credenciales.
-
-### Estado global
-
-- El módulo mantiene `_aes` global porque la clase que reemplaza a `ConfigEntries`
-  necesita la clave sin recibirla por parámetro. Es la única excepción admitida y
-  está documentada en el código. Cualquier otro global mutable es un error.
-
-## 3. Home Assistant
-
-### Estructura
-
-```
-custom_components/safe_store/
-  __init__.py          setup/unload, servicios
-  config_flow.py       alta por UI, sin YAML
-  const.py             constantes
-  crypto.py            lógica pura, sin imports del paquete
-  manifest.json        domain y name primero, el resto alfabético
-  strings.json         fuente de las traducciones
-  translations/en.json generado desde strings.json
-  services.yaml        descripción de cada servicio
-```
-
-### Reglas de integración
-
-- **Siempre `async_setup_entry`**, nunca `async_setup`, para una integración con
-  config entry.
-- **Todo lo que el usuario configura va por config flow.** `configuration.yaml`
-  no es una vía de instalación válida.
-- El texto que ve el usuario vive en `strings.json` y `translations/`; nunca
-  hardcodeado en Python.
-- `manifest.json`: `domain`, `name`, y el resto en orden alfabético. `hassfest`
-  lo verifica y falla si no.
-- `categories` solo con valores de la lista oficial de HA. Si dudás, no lo pongas.
-- Servicios: declarados en `services.yaml` y descritos en `strings.json`.
-- No se crean entidades que no aporten estado. Esta integración no las crea.
-
-### APIs privadas
-
-Este proyecto **depende** de `hass.config_entries._entries` y de reemplazar
-`__class__` en runtime, porque no hay API pública para lo que hace. Eso obliga a:
-
-- aislar cada acceso privado en **una** función (`_descifrar_entry`, el puente);
-- verificar el resultado después de usarlo, no asumir que funcionó;
-- revisar esos puntos en cada actualización mayor de HA.
-
-Si una versión de HA reemplaza una API privada que usamos, el shim falla en
-silencio. Por eso el CI valida y el log avisa con `WARNING` en cada paso.
-
-### Calidad
-
-`hassfest`, `hacs/action` y la validación de assets corren en el CI. Una
-integración que no pasa `hassfest` no es instalable, aunque funcione.
-
-## 4. Reglas del repositorio
-
-1. **SPDX** (`# SPDX-License-Identifier: MIT`) en cada archivo propio.
-2. **DCO**: todo commit con `git commit -s`.
-3. **Fragmento de changelog** en `.changes/unreleased/` por cada cambio.
-4. **La versión vive en dos lugares**: `manifest.json` y `secrets_unlocker/config.yaml`.
-   El release aborta si no coinciden con el tag.
-5. Ciclo: `tema/*` → `devs` → `main` → tag `vX.Y.Z`.
-
-## 5. Lo que ya nos mordió
-
-- `ConfigEntry.__setattr__` rechaza asignar `data`: usar `async_update_entry`.
-- `entry.data` es `MappingProxyType`, no `dict`.
-- `as_storage_fragment` es un `orjson.Fragment` inmutable y cacheado: hay que
-  reconstruir con `as_dict()` y limpiar `entry.__dict__`.
-- El Supervisor reescribe el `data` de `hassio`: ese dominio se excluye.
-- Los custom components cargan **después** de `config_entries.async_initialize()`,
-  así que la primera vuelta se arregla con el puente de arranque.
-- El manifest desordenado tumba `hassfest`; `security` no es una categoría válida.
-- Un add-on con `startup: initialize` arranca ~6s antes del core: hay margen,
-  pero el componente igual necesita reintentos.
-
-## 6. Prohibido
-
-- Afirmar que algo funciona sin ejecutarlo y mostrar la salida.
-- Tocar el HA operativo del usuario para probar: se usa una VM de prueba.
-- Escribir credenciales en archivos del repositorio.
-- Añadir una dependencia sin justificar por qué no alcanza la biblioteca estándar
-  o lo que HA ya trae (`cryptography` y `aiohttp` vienen con el core).
-
-## 7. Comandos
+## Setup commands
 
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install -r requirements_test.txt
-.venv/bin/python -m pytest -q tests
-.venv/bin/ruff check custom_components tests
-.venv/bin/ruff format --check custom_components tests
-tools/hooks/spdx.sh
-python tools/check_assets.py
-tools/changelog.sh prepare X.Y.Z
 ```
+
+Si `PYTHONPATH` apunta a otro entorno, limpialo al invocar Python:
+`env -u PYTHONPATH .venv/bin/python ...`.
+
+## Development commands
+
+```sh
+.venv/bin/python -m pytest -q tests                 # tests
+.venv/bin/ruff check custom_components tests        # lint
+.venv/bin/ruff format --check custom_components tests   # formato
+tools/hooks/spdx.sh                                  # cabeceras SPDX
+python tools/check_assets.py                         # iconos y traducciones
+tools/hooks/dco.sh origin/devs                       # firmas en los commits
+tools/changelog.sh prepare X.Y.Z                     # sección de release
+```
+
+No hay `make`. El proyecto no compila binarios: la validación pesada la hacen
+`hassfest` y la acción de HACS en el CI.
+
+## Code style
+
+- Python 3.12, `line-length = 100`. Lo impone `ruff` (`pyproject.toml`).
+- Type hints en toda función pública, incluido `-> None`.
+- `from __future__ import annotations` al inicio del módulo.
+- `Mapping`/`Sequence` de `collections.abc` en firmas, no `dict`/`list`.
+- `pathlib.Path` para rutas; f-strings para texto; `%s` con argumentos en logging.
+- Docstrings en inglés, una línea de resumen y luego el detalle.
+
+## Architecture
+
+```
+custom_components/safe_store/
+  __init__.py       setup/unload, shim de cifrado, servicio dump
+  config_flow.py    alta por UI (sin YAML)
+  const.py          constantes
+  crypto.py         cifrado puro, sin imports del paquete (testeable aislado)
+  manifest.json     domain y name primero, resto alfabético
+  strings.json      fuente de traducciones
+  translations/     en.json generado desde strings.json
+  brand/            icon.png y logo.png
+secrets_unlocker/   add-on: Dockerfile (sops + age) y server.py
+tools/              hooks de calidad y validación de assets
+.changes/           fragmentos de changelog
+```
+
+## Home Assistant rules
+
+- **Siempre `async_setup_entry`**, nunca `async_setup`.
+- Todo lo configurable va por **config flow**; `configuration.yaml` no es una vía
+  de instalación.
+- Texto de usuario en `strings.json` / `translations/`, nunca en Python.
+- `manifest.json` con `domain`, `name` y el resto alfabético: `hassfest` falla si no.
+- `categories` solo con valores de la lista oficial; si dudás, no lo pongas.
+- Servicios declarados en `services.yaml` y descritos en `strings.json`.
+- Nunca bloquear el event loop: I/O con `async_add_executor_job`, red con timeout.
+
+## Known pitfalls
+
+- `ConfigEntry.__setattr__` rechaza asignar `data`: usar `async_update_entry`.
+- `entry.data` es `MappingProxyType`, no `dict`.
+- `as_storage_fragment` es un `orjson.Fragment` inmutable y cacheado: reconstruir
+  con `as_dict()` y limpiar `entry.__dict__`.
+- El Supervisor reescribe el `data` de `hassio`: ese dominio se excluye.
+- Los custom components cargan después de `config_entries.async_initialize()`;
+  la primera vuelta se arregla con el puente de arranque.
+- Un add-on con `startup: initialize` arranca ~6s antes del core.
+
+## Development workflow
+
+```
+tema/<algo>  →  devs  →  main  →  tag vX.Y.Z
+```
+
+1. **Rama de trabajo**
+
+```sh
+git checkout devs && git pull
+git checkout -b tema/<algo>
+```
+
+2. **Cambio + fragmento de changelog**
+
+`.changes/unreleased/<algo>.md`, una línea en imperativo.
+
+3. **Commit firmado**
+
+```sh
+git add -A
+git commit -s -m "tipo: resumen en imperativo"
+```
+
+4. **PR a `devs`**
+
+```sh
+git push -u origin tema/<algo>
+gh pr create --base devs --fill
+```
+
+El CI tiene que quedar verde: `calidad`, `assets`, `hassfest`, `marketplace`,
+`add-on`, `secretos`, `DCO`, `changelog`.
+
+5. **Integración a `main`** (cuando `devs` está estable)
+
+```sh
+gh pr create --base main --head devs --title "release: <resumen>"
+gh pr merge --merge
+```
+
+6. **Release**
+
+```sh
+git checkout main && git pull
+tools/changelog.sh prepare X.Y.Z          # crea .changes/release-X.Y.Z.md
+# subir "version" en manifest.json Y en secrets_unlocker/config.yaml
+git add -A && git commit -s -m "chore: release X.Y.Z"
+git push
+git tag vX.Y.Z && git push --tags
+```
+
+El workflow de release aborta si el tag no es un merge de `main`, o si
+`manifest.json` y `config.yaml` no dicen la misma versión.
+
+## Definition of done
+
+- Tests pasan y cubren la lógica nueva.
+- `ruff` y el formato, limpios.
+- SPDX en cada archivo tocado.
+- Fragmento de changelog presente.
+- Si cambia la UI: `strings.json` **y** `translations/en.json`.
+- Si cambia una versión: `manifest.json` **y** `config.yaml`.
+- CI verde en el PR.
+
+## Constraints
+
+- No probar nunca contra el Home Assistant operativo: se usa una VM de prueba.
+- No escribir credenciales ni claves en archivos del repositorio.
+- No añadir dependencias si alcanza con `cryptography` o `aiohttp`, que ya vienen
+  con Home Assistant.
+- Si no podés verificar algo, decilo; no lo afirmes.
