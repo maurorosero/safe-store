@@ -25,11 +25,13 @@ from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 
 from .const import (
+    ADDON_PORT,
+    ADDON_SLUG,
     ADDON_TIMEOUT,
-    ADDON_UNLOCK,
     DUMP_FILE,
     EXCLUIDOS,
     KEY_FILE,
+    SUPERVISOR_URL,
     TOKEN_FILE,
 )
 from .crypto import cifrar, descifrar, esta_cifrado
@@ -53,14 +55,51 @@ def _leer_o_crear_token() -> str:
     return token
 
 
+async def _hostname_addon() -> str | None:
+    """Pregunta al Supervisor cómo se llama el add-on en la red interna.
+
+    El hostname lleva el hash del repositorio como prefijo, y ese hash no es
+    parte del contrato: se consulta en vez de asumirlo.
+    """
+    token = os.environ.get("SUPERVISOR_TOKEN")
+    if not token:
+        return None
+    try:
+        timeout = aiohttp.ClientTimeout(total=ADDON_TIMEOUT)
+        async with (
+            aiohttp.ClientSession(
+                timeout=timeout, headers={"Authorization": f"Bearer {token}"}
+            ) as sesion,
+            sesion.get(f"{SUPERVISOR_URL}/addons") as resp,
+        ):
+            if resp.status != 200:
+                return None
+            datos = await resp.json()
+    except (aiohttp.ClientError, TimeoutError, ValueError) as err:
+        _LOGGER.warning("safe_store: no pude listar los add-ons: %s", err)
+        return None
+
+    for addon in (datos.get("data") or {}).get("addons", []):
+        if str(addon.get("slug", "")).endswith(ADDON_SLUG):
+            hostname = addon.get("hostname")
+            return str(hostname) if hostname else None
+    return None
+
+
 async def _clave_desde_addon(hass: HomeAssistant) -> bytes | None:
     """Pide la master key al add-on. Devuelve None si no está disponible."""
+    hostname = await _hostname_addon()
+    if not hostname:
+        _LOGGER.info("safe_store: el add-on no está instalado")
+        return None
+    url = f"http://{hostname}:{ADDON_PORT}/unlock"
+
     try:
         token = await hass.async_add_executor_job(_leer_o_crear_token)
         timeout = aiohttp.ClientTimeout(total=ADDON_TIMEOUT)
         async with (
             aiohttp.ClientSession(timeout=timeout) as sesion,
-            sesion.post(ADDON_UNLOCK, headers={"Authorization": f"Bearer {token}"}) as resp,
+            sesion.post(url, headers={"Authorization": f"Bearer {token}"}) as resp,
         ):
             if resp.status != 200:
                 _LOGGER.warning("safe_store: el add-on respondió %s, sigo sin key", resp.status)

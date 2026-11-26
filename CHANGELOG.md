@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.8] - 2026-11-26
+
+- La integracion le pregunta al Supervisor el hostname del add-on en vez de asumirlo
+
 ## [0.2.7] - 2026-11-26
 
 - El add-on declara un hostname estable y la integracion lo usa, en vez del slug que lleva el hash del repositorio
