@@ -91,7 +91,7 @@ jobs:
           push: false
           tags: safe-store-unlocker:ci
           build-args: |
-            BUILD_FROM=python:3.12-alpine
+            BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
             TARGETARCH=amd64
       - name: el add-on declara lo que el Supervisor exige
         run: |
