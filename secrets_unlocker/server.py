@@ -20,6 +20,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 PORT = 8099
+OPTIONS_FILE = "/data/options.json"
 TOKEN_FILE = "/homeassistant/.ss.token"
 KEY_FILE = "/data/master.key"
 ENC_FILE = "/data/secrets.env.enc"
@@ -35,8 +36,41 @@ def _token() -> str:
         return ""
 
 
+def _opcion(nombre: str) -> str | None:
+    """Lee una opción del panel de configuración del add-on."""
+    try:
+        with open(OPTIONS_FILE, encoding="utf-8") as fh:
+            valor = json.load(fh).get(nombre)
+    except (OSError, ValueError):
+        return None
+    return valor if isinstance(valor, str) and valor.strip() else None
+
+
+def _generar() -> str:
+    """Crea la master key, la guarda en /data y la anuncia una sola vez."""
+    clave = os.urandom(32).hex()
+    with open(KEY_FILE, "w", encoding="utf-8") as fh:
+        fh.write(clave)
+    os.chmod(KEY_FILE, 0o600)
+    print(
+        "MASTER KEY generada: " + clave + "\n"
+        "Guardala en la configuración del add-on si vas a restaurar en otra "
+        "instancia: /data no se respalda.",
+        file=sys.stderr,
+        flush=True,
+    )
+    return clave
+
+
 def _clave() -> str | None:
-    """Devuelve la master key en hex, o None si no hay fuente utilizable."""
+    """Devuelve la master key en hex, o None si no hay fuente utilizable.
+
+    Orden: configuración del add-on, archivo en /data, archivo SOPS.
+    Si no hay ninguna, se genera una y se anuncian sus consecuencias.
+    """
+    if (desde_ui := _opcion("master_key")) is not None:
+        return desde_ui.strip()
+
     try:
         with open(KEY_FILE, encoding="utf-8") as fh:
             return fh.read().strip()
@@ -44,7 +78,7 @@ def _clave() -> str | None:
         pass
 
     if not os.path.exists(ENC_FILE):
-        return None
+        return _generar()
 
     env = dict(os.environ)
     env.setdefault("SOPS_AGE_KEY_FILE", AGE_KEY_FILE)
