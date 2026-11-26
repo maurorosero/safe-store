@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.1] - 2026-11-26
+
+- La master key se configura desde la pestaña de configuración del add-on
+- El add-on genera una master key y la anuncia en su log si no recibe ninguna
+- El README explica cómo obtener y conservar la key sin acceso al filesystem
+
 ## [0.2.0] - 2026-11-26
 
 ### Añadido
