@@ -19,7 +19,7 @@ TOKEN_FILE = Path("/config/.ss.token")
 DUMP_FILE = Path("/config/.ss_dump.json")
 
 # Add-on que entrega la master key.
-ADDON_HOST = "local_secrets_unlocker"
+ADDON_HOST = "secrets-unlocker"
 ADDON_PORT = 8099
 ADDON_UNLOCK = f"http://{ADDON_HOST}:{ADDON_PORT}/unlock"
 ADDON_TIMEOUT = 10
