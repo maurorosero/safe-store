@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: MIT
+blank_issues_enabled: false
+contact_links:
+  - name: Reportar una vulnerabilidad
+    url: https://github.com/maurorosero/safe-store/security/advisories/new
+    about: No abras un issue público para problemas de seguridad.

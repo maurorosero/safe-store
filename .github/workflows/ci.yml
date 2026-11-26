@@ -47,6 +47,19 @@ jobs:
           print("manifest version:", version)
           PY
 
+  assets:
+    name: assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: pillow
+        run: pip install pillow
+      - name: iconos y traducciones
+        run: python tools/check_assets.py
+
   hassfest:
     name: hassfest
     runs-on: ubuntu-latest
@@ -77,6 +90,9 @@ jobs:
           platforms: linux/amd64
           push: false
           tags: safe-store-unlocker:ci
+          build-args: |
+            BUILD_FROM=python:3.12-alpine
+            TARGETARCH=amd64
       - name: el add-on declara lo que el Supervisor exige
         run: |
           python - <<'PY'
