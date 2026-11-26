@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.6] - 2026-11-26
+
+- La integracion crea el token compartido con el add-on si no existe, sin el cual caia siempre al archivo local
+
 ## [0.2.5] - 2026-11-26
 
 - El add-on se declara como servicio s6, que es como arranca la base de Home Assistant
