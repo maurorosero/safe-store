@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # Fragmentos de changelog por cambio, sección por release.
 #   check          informa fragmentos pendientes (no bloquea)
 #   prepare <ver>  arma la sección en CHANGELOG.md y archiva los fragmentos
@@ -32,7 +32,13 @@ case "$cmd" in
     echo >> "$archivo"
 
     if [ -f CHANGELOG.md ]; then
-      { head -n 3 CHANGELOG.md; cat "$archivo"; tail -n +4 CHANGELOG.md; } > CHANGELOG.new
+      # Se inserta antes de la primera sección existente, no después de la cabecera.
+      linea="$(grep -n '^## \[' CHANGELOG.md | head -1 | cut -d: -f1 || true)"
+      if [ -n "${linea}" ]; then
+        { head -n $((linea - 1)) CHANGELOG.md; cat "$archivo"; tail -n +"${linea}" CHANGELOG.md; } > CHANGELOG.new
+      else
+        { cat CHANGELOG.md; echo; cat "$archivo"; } > CHANGELOG.new
+      fi
       mv CHANGELOG.new CHANGELOG.md
     else
       { echo "# Changelog"; echo; cat "$archivo"; } > CHANGELOG.md

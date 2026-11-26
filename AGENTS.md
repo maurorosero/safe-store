@@ -1,57 +1,159 @@
-# AGENTS.md — instrucciones para agentes en este repositorio
+# AGENTS.md
 
-Actuás como **desarrollador senior de Home Assistant** en `safe-store`. Escribís
-código idiomático, lo probás antes de decir que funciona, y no inventás
-comportamiento de HA ni resultados de comandos. Si no lo podés verificar, lo decís.
+Guía para agentes de IA que trabajen en este repositorio. Complementa el
+`README.md` (para humanos) con lo que un agente necesita para no equivocarse:
+comandos, convenciones y el ciclo de desarrollo.
 
-Idioma: código y comentarios en **inglés**; conversación y este documento, en español.
+## Project
 
----
+Integración de Home Assistant (`custom_components/safe_store`) más el add-on que
+la acompaña (`secrets_unlocker`). La integración cifra en reposo el campo `data`
+de `core.config_entries`; el add-on entrega la master key por HTTP local.
 
-## 1. Qué es este proyecto
+Licencia MIT. Código y docstrings en inglés; este documento y los PR en español.
 
-Una integración de Home Assistant y un add-on que la acompaña. La integración
-cifra en reposo el campo `data` de `core.config_entries`; el add-on entrega la
-master key.
+## Setup commands
 
-## 2. Reglas que no se negocian
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -r requirements_test.txt
+```
 
-1. **Cabecera SPDX** (`# SPDX-License-Identifier: GPL-3.0-or-later`) en cada
-   archivo propio: `.py`, `.sh`, `.yaml`, `Makefile` ya no existe, workflows.
-2. **DCO**: todo commit con `git commit -s`.
-3. **Fragmento de changelog** en `.changes/unreleased/` por cada cambio.
-4. **Nunca escribir un guardado si no hay master key.** Con el archivo cifrado y
-   sin key, un guardado deja todas las integraciones ilegibles a la vez.
-5. **La versión vive en dos lugares** y tienen que coincidir: `manifest.json` y
-   `secrets_unlocker/config.yaml`. El release lo verifica.
-6. **No se toca `configuration.yaml` del usuario** en la instalación: la
-   integración se activa por config flow.
+Si `PYTHONPATH` apunta a otro entorno, limpialo al invocar Python:
+`env -u PYTHONPATH .venv/bin/python ...`.
 
-## 3. El ciclo de este proyecto no es el de un binario
+## Development commands
 
-No hay compilación ni empaquetado de ejecutables. Lo que valida el CI:
+```sh
+.venv/bin/python -m pytest -q tests                 # tests
+.venv/bin/ruff check custom_components tests        # lint
+.venv/bin/ruff format --check custom_components tests   # formato
+tools/hooks/spdx.sh                                  # cabeceras SPDX
+python tools/check_assets.py                         # iconos y traducciones
+tools/hooks/dco.sh origin/devs                       # firmas en los commits
+tools/changelog.sh prepare X.Y.Z                     # sección de release
+```
 
-- `ruff` y `pytest` — calidad y lógica;
-- `hassfest` — contrato de integración de HA;
-- `hacs/action` — instalable desde el Marketplace;
-- `docker build` — la imagen del add-on construye;
-- `gitleaks` — sin credenciales en el historial.
+No hay `make`. El proyecto no compila binarios: la validación pesada la hacen
+`hassfest` y la acción de HACS en el CI.
 
-El release es un tag `vX.Y.Z` sobre un merge de `main`. De ahí salen la imagen en
-`ghcr.io` y el zip del componente.
+## Code style
 
-## 4. Detalles de HA que ya nos mordieron
+- Python 3.12, `line-length = 100`. Lo impone `ruff` (`pyproject.toml`).
+- Type hints en toda función pública, incluido `-> None`.
+- `from __future__ import annotations` al inicio del módulo.
+- `Mapping`/`Sequence` de `collections.abc` en firmas, no `dict`/`list`.
+- `pathlib.Path` para rutas; f-strings para texto; `%s` con argumentos en logging.
+- Docstrings en inglés, una línea de resumen y luego el detalle.
+
+## Architecture
+
+```
+custom_components/safe_store/
+  __init__.py       setup/unload, shim de cifrado, servicio dump
+  config_flow.py    alta por UI (sin YAML)
+  const.py          constantes
+  crypto.py         cifrado puro, sin imports del paquete (testeable aislado)
+  manifest.json     domain y name primero, resto alfabético
+  strings.json      fuente de traducciones
+  translations/     en.json generado desde strings.json
+  brand/            icon.png y logo.png
+secrets_unlocker/   add-on: Dockerfile (sops + age) y server.py
+tools/              hooks de calidad y validación de assets
+.changes/           fragmentos de changelog
+```
+
+## Home Assistant rules
+
+- **Siempre `async_setup_entry`**, nunca `async_setup`.
+- Todo lo configurable va por **config flow**; `configuration.yaml` no es una vía
+  de instalación.
+- Texto de usuario en `strings.json` / `translations/`, nunca en Python.
+- `manifest.json` con `domain`, `name` y el resto alfabético: `hassfest` falla si no.
+- `categories` solo con valores de la lista oficial; si dudás, no lo pongas.
+- Servicios declarados en `services.yaml` y descritos en `strings.json`.
+- Nunca bloquear el event loop: I/O con `async_add_executor_job`, red con timeout.
+
+## Known pitfalls
 
 - `ConfigEntry.__setattr__` rechaza asignar `data`: usar `async_update_entry`.
 - `entry.data` es `MappingProxyType`, no `dict`.
-- `as_storage_fragment` es un `orjson.Fragment` inmutable y cacheado: hay que
-  reconstruir con `as_dict()` y limpiar `entry.__dict__`.
+- `as_storage_fragment` es un `orjson.Fragment` inmutable y cacheado: reconstruir
+  con `as_dict()` y limpiar `entry.__dict__`.
 - El Supervisor reescribe el `data` de `hassio`: ese dominio se excluye.
-- Los custom components cargan **después** de `config_entries.async_initialize()`,
-  así que la primera vuelta se arregla con el puente de arranque.
+- Los custom components cargan después de `config_entries.async_initialize()`;
+  la primera vuelta se arregla con el puente de arranque.
+- Un add-on con `startup: initialize` arranca ~6s antes del core.
 
-## 5. Prohibido
+## Development workflow
 
-- Afirmar que algo funciona sin ejecutarlo y mostrar la salida.
-- Tocar el HA operativo del usuario para probar: se usa una VM de prueba.
-- Escribir credenciales en archivos del repositorio.
+```
+tema/<algo>  →  devs  →  main  →  tag vX.Y.Z
+```
+
+1. **Rama de trabajo**
+
+```sh
+git checkout devs && git pull
+git checkout -b tema/<algo>
+```
+
+2. **Cambio + fragmento de changelog**
+
+`.changes/unreleased/<algo>.md`, una línea en imperativo.
+
+3. **Commit firmado**
+
+```sh
+git add -A
+git commit -s -m "tipo: resumen en imperativo"
+```
+
+4. **PR a `devs`**
+
+```sh
+git push -u origin tema/<algo>
+gh pr create --base devs --fill
+```
+
+El CI tiene que quedar verde: `calidad`, `assets`, `hassfest`, `marketplace`,
+`add-on`, `secretos`, `DCO`, `changelog`.
+
+5. **Integración a `main`** (cuando `devs` está estable)
+
+```sh
+gh pr create --base main --head devs --title "release: <resumen>"
+gh pr merge --merge
+```
+
+6. **Release**
+
+```sh
+git checkout main && git pull
+tools/changelog.sh prepare X.Y.Z          # crea .changes/release-X.Y.Z.md
+# subir "version" en manifest.json Y en secrets_unlocker/config.yaml
+git add -A && git commit -s -m "chore: release X.Y.Z"
+git push
+git tag vX.Y.Z && git push --tags
+```
+
+El workflow de release aborta si el tag no es un merge de `main`, o si
+`manifest.json` y `config.yaml` no dicen la misma versión.
+
+## Definition of done
+
+- Tests pasan y cubren la lógica nueva.
+- `ruff` y el formato, limpios.
+- SPDX en cada archivo tocado.
+- Fragmento de changelog presente.
+- Si cambia la UI: `strings.json` **y** `translations/en.json`.
+- Si cambia una versión: `manifest.json` **y** `config.yaml`.
+- CI verde en el PR.
+
+## Constraints
+
+- No probar nunca contra el Home Assistant operativo: se usa una VM de prueba.
+- No escribir credenciales ni claves en archivos del repositorio.
+- No añadir dependencias si alcanza con `cryptography` o `aiohttp`, que ya vienen
+  con Home Assistant.
+- Si no podés verificar algo, decilo; no lo afirmes.

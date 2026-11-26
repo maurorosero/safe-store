@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 """Config flow: solo confirma la activación del shim."""
 
 from __future__ import annotations

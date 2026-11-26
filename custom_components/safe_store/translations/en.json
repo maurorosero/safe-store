@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Safe Store",
+        "description": "Encrypts integration credentials at rest."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Safe Store is already configured."
+    }
+  },
+  "services": {
+    "dump": {
+      "name": "Dump in clear",
+      "description": "Writes decrypted credentials to /config/.ss_dump.json. Required before uninstalling."
+    }
+  }
+}

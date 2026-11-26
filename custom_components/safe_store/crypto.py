@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 """Cifrado simétrico de los campos sensibles de una config entry.
 
 Este módulo es autocontenido a propósito: no importa nada del paquete, para que
