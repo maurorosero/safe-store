@@ -57,21 +57,20 @@ serialised. Integrations are not modified and do not know it exists.
 Settings → Apps → Repositories → add `https://github.com/maurorosero/safe-store`,
 then install **Safe Store Unlocker**.
 
-It needs one of these in its `/data`:
-
-| File | Meaning |
-|---|---|
-| `master.key` | 32 bytes in hex. Simple, no SOPS. |
-| `age.key` + `secrets.env.enc` | age identity and a SOPS file with `SAFE_STORE_MASTER_KEY`. |
-
-Generate a key:
+Then open its **Configuration** tab and paste the master key in `master_key`:
 
 ```sh
 python3 -c "import os;print(os.urandom(32).hex())"
 ```
 
-The age identity is excluded from backups on purpose: restoring in another
-instance means putting it back by hand.
+Leave it empty and the app generates one on first start, prints it once in its
+log, and keeps it in `/data/master.key`. Paste that value back into the
+configuration so it survives a restore — `/data` is not the place where a key
+should live alone.
+
+For SOPS instead of a plain key, put `age.key` and `secrets.env.enc` (with
+`SAFE_STORE_MASTER_KEY`) in `/data` through the SSH or Samba app. The age
+identity is excluded from backups on purpose.
 
 ### Integration
 
