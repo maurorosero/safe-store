@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 """Carga crypto.py por ruta, sin ejecutar el __init__ del componente (que importa HA)."""
 
 import importlib.util

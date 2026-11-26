@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # Exige la cabecera SPDX en los archivos de código y configuración propios.
 set -u
 falta=0

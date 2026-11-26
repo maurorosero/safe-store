@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 """Safe Store: cifrado en reposo del data de core.config_entries.
 
 El core lee core.config_entries una sola vez, antes de cargar los custom

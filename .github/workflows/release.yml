@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # En HA el release es el tag: el Marketplace instala desde ahí y el add-on
 # publica su imagen. Antes de publicar se verifica que el tag sea un merge de
 # main y que la versión del manifest coincida, para que lo instalado no mienta
@@ -83,6 +83,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: la sección del changelog existe
+        run: |
+          test -f ".changes/release-${GITHUB_REF_NAME#v}.md" || {
+            echo "falta .changes/release-${GITHUB_REF_NAME#v}.md: correr tools/changelog.sh prepare ${GITHUB_REF_NAME#v}" >&2
+            exit 1
+          }
       - name: empaquetar el componente para el Marketplace
         run: |
           cd custom_components && zip -r "../safe_store-${GITHUB_REF_NAME}.zip" safe_store
@@ -93,5 +99,5 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             "safe_store-${GITHUB_REF_NAME}.zip" \
             --title "${GITHUB_REF_NAME}" \
-            --generate-notes \
+            --notes-file ".changes/release-${GITHUB_REF_NAME#v}.md" \
             --verify-tag

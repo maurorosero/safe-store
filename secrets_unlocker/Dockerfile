@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
@@ -19,7 +19,7 @@ RUN apk add --no-cache curl \
     && chmod +x /usr/local/bin/sops \
     && mkdir -p /tmp/age && tar -xzf /usr/local/bin/age -C /tmp/age \
     && cp /tmp/age/age/age /tmp/age/age/age-keygen /usr/local/bin/ \
-    && rm -rf /tmp/age /usr/local/bin/age \
+    && rm -rf /tmp/age \
     && sops --version && age --version
 
 COPY server.py /server.py

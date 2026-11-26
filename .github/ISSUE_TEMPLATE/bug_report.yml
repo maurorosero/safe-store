@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: MIT
+name: Reporte de error
+description: Algo no funciona como debería
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Antes de abrir: revisá los logs del add-on y de Home Assistant.
+        No pegues credenciales ni claves en el reporte.
+  - type: input
+    id: version
+    attributes:
+      label: Versión de Safe Store
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: ha
+    attributes:
+      label: Versión de Home Assistant
+      placeholder: 2026.11.2
+    validations:
+      required: true
+  - type: dropdown
+    id: addon
+    attributes:
+      label: ¿El add-on está instalado y corriendo?
+      options: ["Sí", "No", "No aplica"]
+    validations:
+      required: true
+  - type: textarea
+    id: que-pasa
+    attributes:
+      label: Qué pasa
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs relevantes
+      render: text
