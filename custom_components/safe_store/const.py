@@ -18,11 +18,12 @@ TOKEN_FILE = Path("/config/.ss.token")
 # Salida de emergencia: el archivo en claro que hace falta antes de desinstalar.
 DUMP_FILE = Path("/config/.ss_dump.json")
 
-# Add-on que entrega la master key.
-ADDON_HOST = "secrets-unlocker"
+# Add-on que entrega la master key. El hostname lo asigna el Supervisor
+# (prefija el hash del repositorio), así que se consulta en vez de fijarlo.
+ADDON_SLUG = "secrets_unlocker"
 ADDON_PORT = 8099
-ADDON_UNLOCK = f"http://{ADDON_HOST}:{ADDON_PORT}/unlock"
 ADDON_TIMEOUT = 10
+SUPERVISOR_URL = "http://supervisor"
 
 # Dominios cuyo data escribe otra parte (el Supervisor) y no contiene credenciales.
 EXCLUIDOS = frozenset({"hassio"})
