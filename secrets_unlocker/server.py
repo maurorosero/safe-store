@@ -376,7 +376,7 @@ class Handler(BaseHTTPRequestHandler):
                 estado = (
                     f"<p>Huella: <code>{_huella(clave)}</code></p>"
                     f"{aviso}"
-                    '<a class="boton" href="qr.png" download="safe-store-key.png">'
+                    f'<a class="boton" href="{base}qr.png" download="safe-store-key.png">'
                     "Descargar QR</a>"
                 )
             else:
