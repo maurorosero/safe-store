@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.9] - 2026-11-26
+
+- La integracion consulta el detalle del add-on para obtener su direccion, porque el listado no la incluye
+
 ## [0.2.8] - 2026-11-26
 
 - La integracion le pregunta al Supervisor el hostname del add-on en vez de asumirlo
