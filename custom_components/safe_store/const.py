@@ -18,6 +18,9 @@ TOKEN_FILE = Path("/config/.ss.token")
 # Salida de emergencia: el archivo en claro que hace falta antes de desinstalar.
 DUMP_FILE = Path("/config/.ss_dump.json")
 
+# Archivo del core que este componente cifra. Se lee para saber si ya lo está.
+STORAGE_FILE = Path("/config/.storage/core.config_entries")
+
 # Add-on que entrega la master key. El hostname lo asigna el Supervisor
 # (prefija el hash del repositorio), así que se consulta en vez de fijarlo.
 ADDON_SLUG = "secrets_unlocker"
