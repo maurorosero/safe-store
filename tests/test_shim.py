@@ -30,6 +30,29 @@ class EntradaFalsa:
     def as_dict(self) -> dict:
         return {"domain": self.domain, "entry_id": self.entry_id, "data": dict(self.data)}
 
+    @property
+    def as_storage_fragment(self):
+        """Replica el core: un orjson.Fragment con los bytes ya serializados."""
+        import orjson
+
+        return orjson.Fragment(orjson.dumps(self._fragmento()))
+
+    def _fragmento(self) -> dict:
+        return {
+            "entry_id": self.entry_id,
+            "version": 1,
+            "minor_version": 2,
+            "domain": self.domain,
+            "title": self.domain,
+            "data": dict(self.data),
+            "options": {},
+            "pref_disable_new_entities": False,
+            "pref_disable_polling": False,
+            "source": "user",
+            "unique_id": None,
+            "disabled_by": None,
+        }
+
 
 class HassFalso:
     """Lo mínimo que el shim toca del core."""
@@ -144,23 +167,19 @@ def test_descifrar_entry_sin_clave_no_hace_nada(monkeypatch):
 async def test_sin_addon_y_archivo_cifrado_no_crea_una_clave_nueva(monkeypatch, tmp_path):
     monkeypatch.setattr(ss, "_clave_desde_addon", _sin_addon)
     monkeypatch.setattr(ss, "_archivo_cifrado", lambda: True)
-    monkeypatch.setattr(ss, "KEY_FILE", tmp_path / ".ss.key")
 
     assert await ss._obtener_clave(HassFalso()) is None
     assert not (tmp_path / ".ss.key").exists()
 
 
 @pytest.mark.asyncio
-async def test_archivo_en_claro_usa_la_clave_local(monkeypatch, tmp_path):
+async def test_sin_addon_no_inventa_una_clave(monkeypatch, tmp_path):
+    """Sin add-on no se crea clave local: dos claves distintas dejan el archivo ilegible."""
     monkeypatch.setattr(ss, "_clave_desde_addon", _sin_addon)
     monkeypatch.setattr(ss, "_archivo_cifrado", lambda: False)
-    monkeypatch.setattr(ss, "KEY_FILE", tmp_path / ".ss.key")
 
-    clave = await ss._obtener_clave(HassFalso())
-
-    assert clave is not None and len(clave) == 32
-    assert (tmp_path / ".ss.key").exists()
-    assert (tmp_path / ".ss.key").stat().st_mode & 0o777 == 0o600
+    assert await ss._obtener_clave(HassFalso()) is None
+    assert not (tmp_path / ".ss.key").exists()
 
 
 @pytest.mark.asyncio
@@ -169,7 +188,6 @@ async def test_con_addon_usa_la_clave_del_addon(monkeypatch, tmp_path):
         return CLAVE
 
     monkeypatch.setattr(ss, "_clave_desde_addon", _con_addon)
-    monkeypatch.setattr(ss, "KEY_FILE", tmp_path / ".ss.key")
 
     assert await ss._obtener_clave(HassFalso()) == CLAVE
     assert not (tmp_path / ".ss.key").exists()
@@ -204,3 +222,35 @@ async def test_dump_sin_clave_no_escribe(monkeypatch, tmp_path):
     await hass.registros["dump"](None)
 
     assert not (tmp_path / "dump.json").exists()
+
+
+def test_conserva_los_campos_que_agrega_el_core(monkeypatch):
+    """El shim parte de super(): un campo nuevo del core no se pierde."""
+    monkeypatch.setattr(ss, "_aes", AESGCM(CLAVE))
+    shim = shim_con([EntradaFalsa("demo", {"token": "secreto"})])
+
+    datos = shim._data_to_save()
+
+    frag = datos["entries"][0]
+    for campo in ("version", "minor_version", "options", "source", "disabled_by"):
+        assert campo in frag, f"se perdio {campo}"
+    assert frag["data"]["__ss_v1__"]
+
+
+def test_formato_inesperado_del_core_no_borra_el_archivo(monkeypatch):
+    """Si el core cambia la forma del dict, se devuelve tal cual y no se escribe nada."""
+    monkeypatch.setattr(ss, "_aes", AESGCM(CLAVE))
+    monkeypatch.setattr(ss.ConfigEntries, "_data_to_save", lambda self: {"otra_cosa": []})
+    shim = shim_con([EntradaFalsa("ntfy", {"token": "t"})])
+
+    assert shim._data_to_save() == {"otra_cosa": []}
+
+
+def test_lista_vacia_con_entradas_aborta(monkeypatch):
+    """Cero entradas habiendo entradas es una anomalia: mejor no escribir."""
+    monkeypatch.setattr(ss, "_aes", AESGCM(CLAVE))
+    monkeypatch.setattr(ss.ConfigEntries, "_data_to_save", lambda self: {"entries": []})
+    shim = shim_con([EntradaFalsa("ntfy", {"token": "t"})])
+
+    with pytest.raises(RuntimeError):
+        shim._data_to_save()

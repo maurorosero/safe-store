@@ -12,6 +12,7 @@ datos a medio cifrar corrompe todas las integraciones a la vez).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -30,7 +31,6 @@ from .const import (
     ADDON_TIMEOUT,
     DUMP_FILE,
     EXCLUIDOS,
-    KEY_FILE,
     STORAGE_FILE,
     SUPERVISOR_URL,
     TOKEN_FILE,
@@ -132,17 +132,6 @@ async def _clave_desde_addon(hass: HomeAssistant) -> bytes | None:
         return None
 
 
-def _clave_local() -> bytes:
-    """Lee la clave local o la crea con permisos 600 (modo sin add-on)."""
-    if KEY_FILE.exists():
-        return bytes.fromhex(KEY_FILE.read_text().strip())
-    clave = os.urandom(32)
-    KEY_FILE.write_text(clave.hex())
-    os.chmod(KEY_FILE, 0o600)
-    _LOGGER.warning("safe_store: master key local creada en %s", KEY_FILE)
-    return clave
-
-
 def _archivo_cifrado() -> bool:
     """¿El archivo de entradas ya está cifrado?
 
@@ -156,7 +145,14 @@ def _archivo_cifrado() -> bool:
 
 
 async def _obtener_clave(hass: HomeAssistant) -> bytes | None:
-    """Add-on primero; clave local solo si el archivo todavía está en claro."""
+    """Add-on primero. Sin add-on no hay clave: nunca se inventa una.
+
+    Generar una clave local cuando el add-on todavía no arrancó deja dos claves
+    distintas en el sistema: la local y la que el add-on crea despues. El
+    archivo queda cifrado con una que el add-on no conoce, y nada lo puede leer.
+    Es preferible que la integracion quede en reintento y el add-on entregue la
+    suya cuando este.
+    """
     if (clave := await _clave_desde_addon(hass)) is not None:
         _LOGGER.info("safe_store: master key obtenida del add-on")
         return clave
@@ -166,16 +162,12 @@ async def _obtener_clave(hass: HomeAssistant) -> bytes | None:
             "safe_store: el archivo está cifrado y el add-on no responde. "
             "No se crea una clave nueva para no dejarlo ilegible."
         )
-        return None
-
-    _LOGGER.warning(
-        "safe_store: el add-on no responde y el archivo está en claro; se usa una clave local"
-    )
-    try:
-        return await hass.async_add_executor_job(_clave_local)
-    except OSError:
-        _LOGGER.exception("safe_store: no pude leer ni crear la clave local")
-        return None
+    else:
+        _LOGGER.error(
+            "safe_store: el add-on no responde. No se crea una clave local: "
+            "quedaría distinta de la del add-on y el archivo sería ilegible."
+        )
+    return None
 
 
 # --------------------------------------------------------------------------- #
@@ -194,27 +186,63 @@ def _descifrar_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 # --------------------------------------------------------------------------- #
 # Clase que reemplaza a ConfigEntries en runtime
 # --------------------------------------------------------------------------- #
+def _a_dict(frag: Any) -> dict[str, Any]:
+    """Convierte el fragmento del core en un dict mutable.
+
+    `as_storage_fragment` devuelve un `orjson.Fragment`, que es opaco: no expone
+    su contenido. Se recupera serializandolo y volviendolo a leer, para cambiar
+    solo el `data` y conservar todos los campos que armo Home Assistant.
+    """
+    if isinstance(frag, dict):
+        return dict(frag)
+    import orjson
+
+    return orjson.loads(orjson.dumps(frag))
+
+
 class SafeConfigEntries(ConfigEntries):
     """Cifra el data de cada entrada antes de escribir el archivo."""
 
     @callback
     def _data_to_save(self) -> dict[str, list[dict[str, Any]]]:
+        """Cifra el data de cada entrada sobre lo que ya arma Home Assistant.
+
+        Se parte del resultado de super() para no perder campos que el core
+        agregue al archivo: aca solo se transforma el `data` de cada entrada.
+        Si una entrada no se puede cifrar, se aborta el guardado en vez de
+        escribirla en claro.
+        """
+        datos = super()._data_to_save()
+        if not isinstance(datos, dict) or not isinstance(datos.get("entries"), list):
+            _LOGGER.error(
+                "safe_store: el core devolvió un formato inesperado; no se escribe el archivo"
+            )
+            return datos
+        if not datos["entries"] and self._entries:
+            _LOGGER.error(
+                "safe_store: el core devolvió cero entradas habiendo %s; no se escribe",
+                len(self._entries),
+            )
+            raise RuntimeError("safe_store: no se escribe un archivo vacio")
         entradas: list[dict[str, Any]] = []
-        for entry in self._entries.values():
-            frag = entry.as_dict()
-            data = frag.get("data") or {}
-            if entry.domain in EXCLUIDOS or _aes is None:
-                entradas.append(frag)
+        for frag in datos["entries"]:
+            trozo = _a_dict(frag)
+            if trozo.get("domain") in EXCLUIDOS or _aes is None:
+                entradas.append(trozo)
                 continue
-            if not esta_cifrado(data):
-                try:
-                    frag["data"] = cifrar(_aes, data)
-                except Exception:
-                    _LOGGER.exception(
-                        "safe_store: no pude cifrar %s, se guarda en claro",
-                        entry.domain,
-                    )
-            entradas.append(frag)
+            data = trozo.get("data") or {}
+            if esta_cifrado(data):
+                entradas.append(trozo)
+                continue
+            try:
+                trozo["data"] = cifrar(_aes, data)
+            except Exception:
+                _LOGGER.exception(
+                    "safe_store: no pude cifrar %s, no se escribe el archivo",
+                    trozo.get("domain"),
+                )
+                raise
+            entradas.append(trozo)
         return {"entries": entradas}
 
     async def async_initialize(self) -> None:
@@ -257,6 +285,13 @@ def _registrar_servicios(hass: HomeAssistant) -> None:
 # --------------------------------------------------------------------------- #
 # Setup / unload
 # --------------------------------------------------------------------------- #
+async def _recargar_de_a_una(hass: HomeAssistant, entry_ids: list[str]) -> None:
+    """Recarga las entradas una detrás de otra, sin saturar el event loop."""
+    for entry_id in entry_ids:
+        await hass.config_entries.async_reload(entry_id)
+        await asyncio.sleep(0.2)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Arma el shim. Si no hay key, no se arma y HA queda en modo tradicional."""
     global _aes
@@ -273,16 +308,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.warning("safe_store: ConfigEntries %s -> SafeConfigEntries", clase_previa)
 
     # Puente: el core ya cargó el archivo antes de este setup.
-    descifradas = 0
+    descifradas: list[str] = []
     for viva in list(hass.config_entries._entries.values()):
         if _descifrar_entry(hass, viva):
-            descifradas += 1
+            descifradas.append(viva.entry_id)
     if descifradas:
-        _LOGGER.warning("safe_store: puente de arranque, %s entradas", descifradas)
+        _LOGGER.warning("safe_store: puente de arranque, %s entradas", len(descifradas))
 
-    for viva in list(hass.config_entries._entries.values()):
-        if viva.state.name in ("SETUP_ERROR", "SETUP_RETRY"):
-            hass.async_create_task(hass.config_entries.async_reload(viva.entry_id))
+    # Solo se recargan las que se acaban de descifrar y quedaron en error: son
+    # las que fallaron por leer datos cifrados. Lanzarlas todas de golpe deja
+    # una tormenta de recargas en el log y compite por el mismo event loop.
+    pendientes = [
+        entry_id
+        for entry_id in descifradas
+        if (viva := hass.config_entries._entries.get(entry_id)) is not None
+        and viva.state.name in ("SETUP_ERROR", "SETUP_RETRY")
+    ]
+    if pendientes:
+        hass.async_create_task(_recargar_de_a_una(hass, pendientes))
 
     _registrar_servicios(hass)
     async_setup_panel(hass, clave)
