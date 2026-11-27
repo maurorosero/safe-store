@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.24] - 2026-11-27
+
+- La restauracion escribia la llave en options.json, y las opciones si viajan en el backup: la llave terminaba copiada en cada backup. Ahora se escribe en /data/master.key con 600, se verifica que quedo, y recien despues se vacia la opcion. Al arrancar, una clave que haya llegado por las opciones se mueve al archivo. Cuatro pruebas con un directorio real.
+
 ## [0.2.23] - 2026-11-27
 
 - El panel de la llave ahora funciona: era un iframe contra una vista que exigia la cabecera de autorizacion, y el iframe no la manda, asi que HA respondia 401. El panel lleva un token propio en la URL, que solo recibe un administrador porque el panel es require_admin. El add-on deja de exponer Ingress: la interfaz vive en el componente. Probado en la VM: con token 200, sin token 403, QR 200/4059 bytes, 26 tests.
