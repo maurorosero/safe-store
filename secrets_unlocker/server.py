@@ -5,8 +5,9 @@ No expone nada fuera de la red interna de los add-ons: el token lo genera el
 componente en /config/.ss.token y se compara en tiempo constante.
 
 Fuentes de la key, en orden:
-  1. /data/master.key            archivo de 32 bytes en hex (simple)
-  2. /data/secrets.env.enc       archivo SOPS, descifrado con la identidad age
+  1. /data/master.key            archivo de 32 bytes en hex, 600, fuera del backup
+  2. la opcion master_key        solo de paso: se mueve al archivo al arrancar
+  3. /data/secrets.env.enc       archivo SOPS, descifrado con la identidad age
                                  en /data/age.key
 """
 
@@ -66,8 +67,8 @@ def _generar() -> str:
     os.chmod(KEY_FILE, 0o600)
     print(
         "MASTER KEY generada: " + clave + "\n"
-        "Guardala en la configuración del add-on si vas a restaurar en otra "
-        "instancia: /data no se respalda.",
+        "Descargá el QR desde el panel Safe Store y guardalo fuera de Home "
+        "Assistant: /data no se respalda.",
         file=sys.stderr,
         flush=True,
     )
@@ -80,14 +81,15 @@ def _clave() -> str | None:
     Orden: configuración del add-on, archivo en /data, archivo SOPS.
     Si no hay ninguna, se genera una y se anuncian sus consecuencias.
     """
-    if (desde_ui := _opcion("master_key")) is not None:
-        return desde_ui.strip()
-
     try:
         with open(KEY_FILE, encoding="utf-8") as fh:
-            return fh.read().strip()
+            if clave := fh.read().strip():
+                return clave
     except OSError:
         pass
+
+    if (desde_ui := _opcion("master_key")) is not None:
+        return desde_ui.strip()
 
     if not os.path.exists(ENC_FILE):
         return _generar()
@@ -135,17 +137,30 @@ def _qr_png(clave: str) -> bytes:
     return buffer.getvalue()
 
 
-def _guardar_clave(clave: str) -> bool:
-    """Escribe master_key en las opciones del add-on, vía Supervisor.
+def _escribir_archivo(clave: str) -> bool:
+    """Guarda la clave en /data/master.key, con 600, y comprueba que quedó."""
+    try:
+        with open(KEY_FILE, "w", encoding="utf-8") as fh:
+            fh.write(clave.strip())
+        os.chmod(KEY_FILE, 0o600)
+        with open(KEY_FILE, encoding="utf-8") as fh:
+            return fh.read().strip() == clave.strip()
+    except OSError as err:
+        print(f"no pude escribir {KEY_FILE}: {err}", file=sys.stderr)
+        return False
 
-    Las opciones sí viajan en los backups, así que después de esto la clave
-    sobrevive a un restore. El add-on puede escribir su propia configuración
-    sin pedir hassio_api.
+
+def _vaciar_opcion() -> None:
+    """Deja master_key vacío en las opciones.
+
+    Las opciones viajan en el backup; la llave no debe hacerlo. Se escribe el
+    archivo primero y recién después se vacía la opción: si algo falla en el
+    medio, la llave sigue estando en un lado.
     """
     token = os.environ.get("SUPERVISOR_TOKEN", "")
     if not token:
-        return False
-    datos = json.dumps({"options": {"master_key": clave}}).encode()
+        return
+    datos = json.dumps({"options": {"master_key": ""}}).encode()
     peticion = urllib.request.Request(
         f"{SUPERVISOR}/addons/self/options",
         data=datos,
@@ -153,11 +168,51 @@ def _guardar_clave(clave: str) -> bool:
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(peticion, timeout=20) as resp:
-            return resp.status == 200
+        urllib.request.urlopen(peticion, timeout=20).close()
     except (urllib.error.URLError, OSError, ValueError) as err:
-        print(f"no pude guardar la opción: {err}", file=sys.stderr)
+        print(f"no pude vaciar la opcion: {err}", file=sys.stderr)
+
+
+def _adoptar_opcion() -> None:
+    """Mueve al archivo una clave que llegó por las opciones.
+
+    Restaurar desde la interfaz escribe la llave en las opciones, y las
+    opciones viajan en el backup. Al arrancar se copia al archivo y se vacía
+    la opción, para que la llave quede fuera del backup sin perderla.
+    """
+    desde_ui = _opcion("master_key")
+    if desde_ui is None:
+        return
+    clave = desde_ui.strip()
+    if os.path.exists(KEY_FILE):
+        try:
+            with open(KEY_FILE, encoding="utf-8") as fh:
+                if fh.read().strip() == clave:
+                    _vaciar_opcion()
+                    return
+        except OSError:
+            pass
+    if _escribir_archivo(clave):
+        print(
+            f"clave restaurada movida a {KEY_FILE} ({_huella(clave)}); opcion vaciada",
+            file=sys.stderr,
+            flush=True,
+        )
+        _vaciar_opcion()
+    else:
+        print("no pude mover la clave al archivo: queda en las opciones", file=sys.stderr)
+
+
+def _guardar_clave(clave: str) -> bool:
+    """Guarda la clave en /data/master.key, que no viaja en el backup.
+
+    Antes se escribía en las opciones, y las opciones sí viajan: la llave
+    terminaba copiada en cada backup, que es justo lo que hay que evitar.
+    """
+    if not _escribir_archivo(clave):
         return False
+    _vaciar_opcion()
+    return True
 
 
 def _reiniciar() -> None:
@@ -420,5 +475,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    _adoptar_opcion()
     print(f"secrets-unlocker escuchando en :{PORT}", flush=True)
     HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
