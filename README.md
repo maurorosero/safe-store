@@ -116,7 +116,7 @@ There is nothing to paste here.
 
 ### Step 4 · Check it worked
 
-- A **Safe Store** entry appears in the sidebar, for administrators only.
+- **Settings → Apps → Safe Store Unlocker → Open web UI** shows the key and the QR button.
 - It shows a fingerprint and a **Download QR** button.
 - Download that PNG and keep it next to the key from step 2.
 - Entries keep loading: **Settings → Devices & services** should show no
@@ -166,8 +166,7 @@ disk is not a backup of the key in any sense.
 
 ### Getting the key out, and back in
 
-The integration adds a **Safe Store** entry to the sidebar. Only administrators see it,
-and the API behind it checks the same thing on every request.
+The app has a web interface: **Settings → Apps → Safe Store Unlocker → Open web UI**.
 
 - **Your key.** It shows the fingerprint and a **Download QR** button. That PNG *is* the
   key: print it, keep it in a safe, or upload it to a secrets manager such as Infisical.
@@ -176,10 +175,9 @@ and the API behind it checks the same thing on every request.
   into the app configuration and restarts it. Configuration travels in backups, so after
   restoring once the key no longer lives only in `/data`.
 
-Why the sidebar and not the app's own web UI: Ingress lets any signed-in user open an
-add-on panel, and the Supervisor has no per-panel role setting. A `HomeAssistantView`
-does know who is calling, so this is the only way to make "administrators only" true
-rather than cosmetic.
+The panel is served by the app through Ingress, so only someone with a session in Home
+Assistant can open it. It is not limited to administrators: Ingress does not carry the
+user's role. If that matters in your instance, keep it in mind.
 
 ## Services
 
@@ -203,7 +201,7 @@ action: safe_store.dump
 | Full reboot of the machine | verified: 11 of 11 entries `loaded` |
 | Save after a restart | verified: the new entry is written encrypted |
 | App down with the file encrypted | verified: nothing is written, the entry stays in `setup_retry`, no local key is created |
-| Sidebar panel: download the key QR | verified inside Home Assistant, administrators only |
+| App web UI: download the key QR | verified inside Home Assistant through Ingress |
 | Restore by uploading the PNG | verified: writes `master_key`, the Supervisor rewrites the file, all entries load |
 | Unit tests of the shim | verified: encrypt on save, decrypt on load, key lookup, `dump`, and no new key over an encrypted file |
 | `safe_store.dump` | verified: 11 entries in plain text, `600`, while the file stays encrypted |
