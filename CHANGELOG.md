@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.16] - 2026-11-27
+
+- safe_store.dump queda verificado: vuelca las entradas en claro con permisos 600 mientras el archivo original sigue cifrado.
+
 ## [0.2.15] - 2026-11-27
 
 - La tabla de estado del README recoge lo verificado de la interfaz: descarga del QR dentro de Home Assistant, restauracion subiendo el PNG y el aviso cuando la llave no tiene copia.
