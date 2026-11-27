@@ -31,10 +31,11 @@ from .const import (
     DUMP_FILE,
     EXCLUIDOS,
     KEY_FILE,
+    STORAGE_FILE,
     SUPERVISOR_URL,
     TOKEN_FILE,
 )
-from .crypto import cifrar, descifrar, esta_cifrado
+from .crypto import MARCA, cifrar, descifrar, esta_cifrado
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -141,11 +142,34 @@ def _clave_local() -> bytes:
     return clave
 
 
+def _archivo_cifrado() -> bool:
+    """¿El archivo de entradas ya está cifrado?
+
+    Si lo está y el add-on no responde, no se puede generar una clave nueva:
+    las entradas viejas quedarían ilegibles para siempre.
+    """
+    try:
+        return MARCA in STORAGE_FILE.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
 async def _obtener_clave(hass: HomeAssistant) -> bytes | None:
-    """Add-on primero; si no responde, clave local. Sin nada, no se arma."""
+    """Add-on primero; clave local solo si el archivo todavía está en claro."""
     if (clave := await _clave_desde_addon(hass)) is not None:
         _LOGGER.info("safe_store: master key obtenida del add-on")
         return clave
+
+    if await hass.async_add_executor_job(_archivo_cifrado):
+        _LOGGER.error(
+            "safe_store: el archivo está cifrado y el add-on no responde. "
+            "No se crea una clave nueva para no dejarlo ilegible."
+        )
+        return None
+
+    _LOGGER.warning(
+        "safe_store: el add-on no responde y el archivo está en claro; se usa una clave local"
+    )
     try:
         return await hass.async_add_executor_job(_clave_local)
     except OSError:
