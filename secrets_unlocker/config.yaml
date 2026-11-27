@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 name: Safe Store Unlocker
-version: "0.2.21"
+version: "0.2.22"
 slug: secrets_unlocker
 hostname: secrets-unlocker
 description: Hands the Safe Store master key to Home Assistant over the local network
@@ -11,6 +11,10 @@ arch:
 startup: initialize
 boot: auto
 init: false
+ingress: true
+ingress_port: 8099
+panel_title: Safe Store
+panel_icon: mdi:shield-key
 map:
   - type: homeassistant_config
     read_only: true
