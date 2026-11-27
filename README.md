@@ -161,6 +161,9 @@ action: safe_store.dump
 | Full reboot of the machine | verified: 11 of 11 entries `loaded` |
 | Save after a restart | verified: the new entry is written encrypted |
 | App down with the file encrypted | verified: nothing is written, the entry stays in `setup_retry`, no local key is created |
+| Web UI: download the key QR | verified inside Home Assistant through Ingress |
+| Restore by uploading the PNG | verified: writes `master_key`, the Supervisor rewrites the file, all entries load |
+| Warning when the key has no downloaded copy | verified |
 | `safe_store.dump` | verified on the POC build, **not re-run on 0.2.10** |
 | Add-on image | builds, published to ghcr.io |
 | Master key rotation | **not implemented** |
