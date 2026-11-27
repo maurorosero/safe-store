@@ -89,7 +89,7 @@ def _sembrar_dobles() -> None:
 
     exceptions = types.ModuleType("homeassistant.exceptions")
 
-    class ConfigEntryNotReady(Exception):
+    class ConfigEntryNotReady(Exception):  # noqa: N818 - replica el nombre de HA
         pass
 
     exceptions.ConfigEntryNotReady = ConfigEntryNotReady
