@@ -98,6 +98,12 @@ def _sembrar_dobles() -> None:
         async def async_reload(self, entry_id):
             return None
 
+        def _data_to_save(self):
+            """Replica el core: una lista de fragmentos, uno por entrada."""
+            return {
+                "entries": [entry.as_storage_fragment for entry in self._entries.values()]
+            }
+
     config_entries.ConfigEntry = ConfigEntry
     config_entries.ConfigEntries = ConfigEntries
 
