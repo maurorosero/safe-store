@@ -116,7 +116,8 @@ There is nothing to paste here.
 
 ### Step 4 · Check it worked
 
-- **Settings → Apps → Safe Store Unlocker → Open web UI** shows the key and the QR button.
+- **Safe Store** in the sidebar shows the key, the QR button and the restore form. It is
+  administrator only, and the page is served by the integration itself.
 - It shows a fingerprint and a **Download QR** button.
 - Download that PNG and keep it next to the key from step 2.
 - Entries keep loading: **Settings → Devices & services** should show no
