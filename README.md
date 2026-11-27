@@ -5,7 +5,7 @@
 [![CI][ci-badge]][ci-url]
 [![Release][release-badge]][release-url]
 [![License][license-badge]][license-url]
-[![HACS Custom][hacs-badge]][hacs-url]
+[![Marketplace][market-badge]][market-url]
 
 An encryption layer for the credentials of Home Assistant integrations.
 
@@ -17,12 +17,26 @@ unassigned and uncommented. Core protects `.storage/auth` with `0600` and leaves
 `core.config_entries` at `0644`: the file that holds the credentials is the one
 with the loosest permissions.
 
-**Status: 0.2.11.** Installed from this repository on a clean Home Assistant OS
-18.4 (core 2026.11) with no manual steps: the app generates the master key, the
-integration asks for it over HTTP, and 11 entries came back `loaded` after a
-full reboot of the machine. With the app down and the file encrypted, it writes
-nothing and stays in `setup_retry` instead of falling back to a new key. See
-[Status](#status) for what is and is not exercised.
+**Status: 0.2.25.** Running on a real Home Assistant OS 18.4 (core 2026.11.2)
+with 24 configuration entries, all `loaded`. The app installs from this
+repository pulling a published image, not compiling. See [Status](#status) for
+what is and is not exercised.
+
+## Read this first
+
+- **It hooks a private method.** The component replaces `ConfigEntries` at
+  runtime and overrides `_data_to_save`. That is not a public interface. **A
+  Home Assistant update can break it**, and when that happens the entries stop
+  loading instead of coming up unencrypted — by design, but it is still an
+  outage you have to fix. If that trade is not acceptable to you, don't run it.
+- **The key lives on the same host**, readable by the app at `0600`. A process
+  that can read the key can read the credentials. This first scope protects the
+  file at rest and in backups; keeping the key off the box is a later problem.
+- **It covers config entry `data` only.** `secrets.yaml` is not touched.
+
+If you decide to run it, run `safe_store.dump` before uninstalling, and keep a
+copy of the master key outside Home Assistant. Without the key nothing can read
+the file, and there is no recovery built in.
 
 ## What it does
 
@@ -30,12 +44,13 @@ nothing and stays in `setup_retry` instead of falling back to a new key. See
   reaches the disk, and decrypts it in memory at startup.
 - Leaves `entry_id`, `domain`, `title` and `version` readable: Home Assistant
   can still list your integrations without being able to read a single secret.
-- Keeps the master key out of Home Assistant. A companion app holds it and
-  hands it over the local network with a token.
-- Accepts the key from a plain file or from a SOPS-encrypted env file unlocked
-  with an age identity that is deliberately excluded from backups.
-- Enables through the interface (config flow) — no `configuration.yaml`, no
-  changes to any integration.
+- Keeps the master key out of the encrypted file. A companion app holds it in
+  `/data/master.key` (`0600`), a path excluded from backups, and hands it to the
+  integration over the local network with a token.
+- Gives you the key in a form you can store offline: a QR, downloadable from a
+  panel, administrator only, restorable by uploading that PNG.
+- Installs through the interface: no `configuration.yaml`, no changes to any
+  integration.
 
 ## How it works
 
@@ -50,16 +65,12 @@ every save
   data is encrypted before writing → no plaintext on disk
 ```
 
-The component replaces `ConfigEntries` at runtime and overrides how the file is
-serialised. Integrations are not modified and do not know it exists.
+Integrations are not modified and do not know it exists.
 
 ## Installation
 
-**The app goes first, the integration second.** The integration does not hold a
-key of its own: it asks the app for one. Installed first, it finds no app,
-creates a key in `/config/.ss.key` and encrypts with that one — and the app,
-installed later, generates a *different* key, after which nothing can be read.
-Every step below assumes that order.
+The app goes first, the integration second: the integration has no key of its
+own, it asks the app for one.
 
 ### Step 1 · Add the app repository
 
@@ -73,31 +84,14 @@ Every step below assumes that order.
 If that row is not there, the repository was not added and the app will not
 exist in the store. This is the step that gets skipped most often.
 
-### Step 2 · Install and start the app
+### Step 2 · Install the app
 
 1. Still in **Apps**, search for **Safe Store Unlocker**.
-2. **Install**, then open it.
-3. Go to the **Configuration** tab and find `master_key`. Paste a key there. To
-   make one:
+2. **Install**, then **Start**. The image is downloaded, so it takes seconds.
+3. Open the **Log** tab. It must say `secrets-unlocker escuchando en :8099`.
 
-   ```sh
-   python3 -c "import os;print(os.urandom(32).hex())"
-   ```
-
-4. **Save that string outside Home Assistant now** — a password manager, or
-   Infisical. Without it, a restored backup cannot be decrypted.
-5. **Save**, then **Start**.
-6. Open the **Log** tab. It must say `secrets-unlocker escuchando en :8099`.
-
-Leaving `master_key` empty also works: the app generates one on the first
-request and prints it once in its log, keeping it in `/data/master.key`. But
-`/data` is not in Home Assistant backups, so that key would not come back with a
-restore. Filling the field is the safer path. See
-[The master key](#the-master-key).
-
-For SOPS instead of a plain key, put `age.key` and `secrets.env.enc` (with
-`SAFE_STORE_MASTER_KEY`) in `/data` through the SSH or Samba app. The age
-identity is excluded from backups on purpose.
+Nothing to paste: on first use the app generates the master key, stores it in
+`/data/master.key` with `0600`, and hands it to the integration.
 
 ### Step 3 · Install the integration
 
@@ -111,74 +105,46 @@ identity is excluded from backups on purpose.
 4. **Settings → Devices & services → Add integration → Safe Store.** Leave the
    form empty: the integration finds the app on its own.
 
-The integration creates `/config/.ss.token` (600) and asks the app for the key.
-There is nothing to paste here.
+The integration creates `/config/.ss.token` (`600`) and asks the app for the key.
 
-### Step 4 · Check it worked
+### Step 4 · Get the key out
 
-- **Safe Store** in the sidebar shows the key, the QR button and the restore form. It is
-  administrator only, and the page is served by the integration itself.
-- It shows a fingerprint and a **Download QR** button.
-- Download that PNG and keep it next to the key from step 2.
-- Entries keep loading: **Settings → Devices & services** should show no
-  integration in *Retry*.
+1. Open **Safe Store** in the sidebar. It is administrator only.
+2. It shows the fingerprint and a **Download QR** button.
+3. Press it and keep that PNG **outside** Home Assistant: printed, in a safe, or
+   in a password manager.
 
-### If you installed the integration first
+That PNG is the key. There is no second copy.
 
-Your key is now in `/config/.ss.key`, and the app, if it already started, made a
-different one. Fix it before going further:
+### Step 5 · Check it worked
 
-1. Open `/config/.ss.key` through the SSH or Samba app and copy its contents.
-2. Paste it into the app's `master_key` field.
-3. If the app had already started and wrote `/data/master.key`, delete that file
-   first, or it will keep using its own.
-4. Start the app and restart Home Assistant. Entries should load again.
-
-[ci-badge]: https://github.com/maurorosero/safe-store/actions/workflows/ci.yml/badge.svg?branch=main
-[ci-url]: https://github.com/maurorosero/safe-store/actions/workflows/ci.yml
-[release-badge]: https://img.shields.io/github/v/release/maurorosero/safe-store
-[release-url]: https://github.com/maurorosero/safe-store/releases
-[license-badge]: https://img.shields.io/github/license/maurorosero/safe-store
-[license-url]: LICENSE
-[hacs-badge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg
-[hacs-url]: https://github.com/hacs/integration
-[add-repo-badge]: https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg
-[add-repo-url]: https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmaurorosero%2Fsafe-store
-[add-hacs-badge]: https://my.home-assistant.io/badges/hacs_repository.svg
-[add-hacs-url]: https://my.home-assistant.io/redirect/hacs_repository/?owner=maurorosero&repository=safe-store&category=integration
+**Settings → Devices & services** should show no integration in *Retry*. If any
+is, the app is not delivering the key; see [Troubleshooting](#troubleshooting).
 
 ## The master key
 
-One key protects everything. A few things about it are worth reading twice:
+One key protects everything.
 
-- **Where it lives.** In the app's **Configuration** tab (`master_key`), or in
-  `/data/master.key` when you leave that field empty and let the app generate one.
-- **You see it once.** The app prints it to its log the first time it generates it,
-  with a warning. It is not shown again.
-- **It is not in your backups.** `/data` is excluded from Home Assistant backups on
-  purpose: a backup carrying both the encrypted file and its key would protect
-  nothing. That means a restore brings the encrypted file back **without** the key —
-  and if `master_key` is empty, every integration comes back unreadable.
-- **Keep a copy outside Home Assistant.** A password manager, or a secrets manager
-  such as Infisical. Copy it the moment it appears in the log.
+- **Where it lives.** `/data/master.key` inside the app, `0600`. The app writes
+  it there and hands it over on request. The add-on option `master_key` is only
+  a landing spot for a restored key: it is written to the file and emptied on
+  the next boot, because options *are* included in backups and the key must not
+  be.
+- **What travels in a backup.** The encrypted `core.config_entries`, and the
+  app's configuration with `master_key` empty. `master.key` and `age.key` are
+  excluded by name in `backup_exclude`. A restore therefore brings back
+  ciphertext and **not** the key.
+- **Keep a copy outside Home Assistant.** The QR from step 4. Print it, or put
+  it in a secrets manager. It is the only copy that survives a lost disk.
+- **You can download it again** at any time while the app still holds it.
 
-Losing the key is not recoverable here: `safe_store.dump` needs it too. The file on
-disk is not a backup of the key in any sense.
+Losing the key is not recoverable here: `safe_store.dump` needs it too.
 
-### Getting the key out, and back in
+### Restoring a key
 
-The app has a web interface: **Settings → Apps → Safe Store Unlocker → Open web UI**.
-
-- **Your key.** It shows the fingerprint and a **Download QR** button. That PNG *is* the
-  key: print it, keep it in a safe, or upload it to a secrets manager such as Infisical.
-  You can download it again at any time while the app still holds the key.
-- **Restore from a file.** Upload that PNG. The integration reads the QR, writes the key
-  into the app configuration and restarts it. Configuration travels in backups, so after
-  restoring once the key no longer lives only in `/data`.
-
-The panel is served by the app through Ingress, so only someone with a session in Home
-Assistant can open it. It is not limited to administrators: Ingress does not carry the
-user's role. If that matters in your instance, keep it in mind.
+Upload the PNG in the panel. The integration reads the QR, writes the key to
+`/data/master.key`, empties the option, and restarts the app. Every entry comes
+back on the next reload.
 
 ## Services
 
@@ -196,18 +162,19 @@ action: safe_store.dump
 
 | Piece | State |
 |---|---|
-| Encryption, decryption, reload | verified on HAOS 18.4 / core 2026.11 |
-| Integration ↔ add-on over HTTP | verified: the app generates the key, the integration fetches it |
-| Fresh install from the repository, no manual steps | verified on a clean HAOS 18.4 |
-| Full reboot of the machine | verified: 11 of 11 entries `loaded` |
-| Save after a restart | verified: the new entry is written encrypted |
-| App down with the file encrypted | verified: nothing is written, the entry stays in `setup_retry`, no local key is created |
-| App web UI: download the key QR | verified inside Home Assistant through Ingress |
-| Restore by uploading the PNG | verified: writes `master_key`, the Supervisor rewrites the file, all entries load |
-| Unit tests of the shim | verified: encrypt on save, decrypt on load, key lookup, `dump`, and no new key over an encrypted file |
-| `safe_store.dump` | verified: 11 entries in plain text, `600`, while the file stays encrypted |
-| Add-on image | builds, published to ghcr.io |
+| Encryption, decryption, reload | verified on HAOS 18.4 / core 2026.11.2 — 24 of 24 entries `loaded` |
+| A new integration is encrypted on creation | verified: 23 encrypted entries, 24 total (`hassio` excluded) |
+| Deleting that integration returns the file | verified |
+| Clean install from the repository | verified on a clean HAOS 18.4 |
+| App installs from the published image | verified: `Downloading docker image ... tag 0.2.25`, 22 s |
+| Panel: fingerprint and QR | verified: `200 image/png`, decodes to the stored key |
+| Panel without the panel token | verified: `403` |
+| Restore by uploading the PNG | verified: key written to `/data/master.key`, entries load |
+| Option `master_key` after a restore | verified: emptied on the next boot |
+| Unit tests | 30, run without Home Assistant installed |
+| `safe_store.dump` | verified |
 | Master key rotation | **not implemented** |
+| `secrets.yaml` | **not covered** |
 
 If the app is unavailable and the file is encrypted, Safe Store **writes
 nothing** and the entries stay in `setup_retry`. A save with half-encrypted data
@@ -221,22 +188,35 @@ would corrupt every integration at once.
   encrypting the file next to it.
 - It does not encrypt `hassio`: the Supervisor rewrites that entry's `data` on
   every boot.
+- It does not rotate the master key. Changing it by hand makes the file
+  unreadable.
+
+## Uninstalling
+
+The encrypted file is only readable with the key, so the order matters:
+
+1. Run `safe_store.dump` and confirm `/config/.ss_dump.json` has your
+   credentials, in plain text, `600`.
+2. Keep that file somewhere safe and delete it from `/config` afterwards — it is
+   unencrypted.
+3. Remove the integration, then the app.
+4. If you kept a copy of the key, the encrypted file stays decryptable later.
 
 ## Troubleshooting
 
 **Integrations stuck in `setup_retry` after boot**
-The app is not delivering the key. Check Settings → Apps → Safe Store Unlocker →
-Log. `/config/.ss.key` appearing means the integration fell back to a local key:
-that file and the one in the app are not the same, so a file encrypted with one
-cannot be read with the other.
+The app is not delivering the key. Check **Settings → Apps → Safe Store
+Unlocker → Log**. A `/config/.ss.key` file would mean an older version fell back
+to a local key, which is not the same one the app holds.
 
-**I want to uninstall**
-Run `safe_store.dump` first, confirm `.ss_dump.json` has the credentials, then
-uninstall.
+**The panel shows "Solo administradores" or nothing**
+The panel is administrator only and carries a token generated at startup. A
+non-administrator session gets `403` by design. If you are an administrator and
+see nothing, restart Home Assistant so the panel is registered again.
 
 **I lost the master key**
-The file cannot be read by anything, and `dump` needs the key too. The only way
-out is a backup of the key you kept outside Home Assistant.
+Nothing can read the file, and `dump` needs the key too. The only way out is the
+QR or the copy you kept outside Home Assistant.
 
 **I changed the master key**
 There is no rotation yet: the file becomes unreadable. Restore the previous key,
@@ -250,3 +230,16 @@ and a release is a tag on the merge commit of `main`.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+[ci-badge]: https://github.com/maurorosero/safe-store/actions/workflows/ci.yml/badge.svg?branch=main
+[ci-url]: https://github.com/maurorosero/safe-store/actions/workflows/ci.yml
+[release-badge]: https://img.shields.io/github/v/release/maurorosero/safe-store
+[release-url]: https://github.com/maurorosero/safe-store/releases
+[license-badge]: https://img.shields.io/github/license/maurorosero/safe-store
+[license-url]: LICENSE
+[market-badge]: https://img.shields.io/badge/Marketplace-submitted-blue
+[market-url]: https://github.com/hacs/default/pull/15100
+[add-hacs-badge]: https://my.home-assistant.io/badges/hacs_repository.svg
+[add-hacs-url]: https://my.home-assistant.io/redirect/hacs_repository/?owner=maurorosero&repository=safe-store&category=integration
+[add-repo-badge]: https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg
+[add-repo-url]: https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmaurorosero%2Fsafe-store
