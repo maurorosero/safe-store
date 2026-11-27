@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.22] - 2026-11-27
+
+- La interfaz de la llave vuelve al add-on por Ingress, que es la que se certifico en la VM: se habia movido al componente y el panel no montaba.
+
 ## [0.2.21] - 2026-11-27
 
 - La instalacion se documenta paso a paso y dice que el add-on va primero: instalar la integracion antes deja la llave en /config y el add-on ya no puede leer el archivo.

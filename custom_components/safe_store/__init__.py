@@ -36,7 +36,6 @@ from .const import (
     TOKEN_FILE,
 )
 from .crypto import MARCA, cifrar, descifrar, esta_cifrado
-from .paper import async_setup_panel
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -285,7 +284,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.async_create_task(hass.config_entries.async_reload(viva.entry_id))
 
     _registrar_servicios(hass)
-    async_setup_panel(hass, clave)
     return True
 
 
