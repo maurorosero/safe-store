@@ -22,6 +22,7 @@ import urllib.error
 import urllib.request
 
 import aiohttp
+from aiohttp import web
 from homeassistant.components.frontend import async_register_built_in_panel
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
@@ -150,8 +151,8 @@ class PaperView(HomeAssistantView):
             return self.json_message("sin master key", status_code=503)
 
         datos = await request.app["hass"].async_add_executor_job(_png, _clave)
-        return self.response(
-            datos,
+        return web.Response(
+            body=datos,
             content_type="image/png",
             headers={"Content-Disposition": 'attachment; filename="safe-store-key.png"'},
         )
@@ -192,7 +193,7 @@ class PanelView(HomeAssistantView):
     requires_auth = False
 
     async def get(self, request):
-        return self.response(JS_PANEL, content_type="text/javascript")
+        return web.Response(text=JS_PANEL, content_type="text/javascript")
 
 
 JS_PANEL = """

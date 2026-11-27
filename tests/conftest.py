@@ -42,10 +42,24 @@ def _sembrar_dobles() -> None:
     class ClientError(Exception):
         pass
 
+    web = types.ModuleType("aiohttp.web")
+
+    class Response:
+        def __init__(self, body=None, text=None, content_type=None, headers=None, status=200):
+            self.body = body
+            self.text = text
+            self.content_type = content_type
+            self.headers = headers or {}
+            self.status = status
+
+    web.Response = Response
+    aiohttp.web = web
+
     aiohttp.ClientTimeout = ClientTimeout
     aiohttp.ClientSession = ClientSession
     aiohttp.ClientError = ClientError
     sys.modules["aiohttp"] = aiohttp
+    sys.modules["aiohttp.web"] = web
 
     core = types.ModuleType("homeassistant.core")
 
@@ -107,10 +121,6 @@ def _sembrar_dobles() -> None:
 
         @staticmethod
         def json(datos, status_code=200):
-            return datos
-
-        @staticmethod
-        def response(datos, content_type=None, headers=None):
             return datos
 
     http.HomeAssistantView = HomeAssistantView
