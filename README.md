@@ -68,10 +68,11 @@ Then open its **Configuration** tab and paste the master key in `master_key`:
 python3 -c "import os;print(os.urandom(32).hex())"
 ```
 
-Leave it empty and the app generates one on first start, prints it once in its
-log, and keeps it in `/data/master.key`. Paste that value back into the
-configuration so it survives a restore — `/data` is not the place where a key
-should live alone.
+Leave it empty and the app generates one on the first request, prints it once in
+its log, and keeps it in `/data/master.key`. `/data` is not in Home Assistant
+backups, so a restore brings the file back without the key: paste the value into
+this field and the key travels with the configuration. See
+[The master key](#the-master-key).
 
 For SOPS instead of a plain key, put `age.key` and `secrets.env.enc` (with
 `SAFE_STORE_MASTER_KEY`) in `/data` through the SSH or Samba app. The age
@@ -105,6 +106,38 @@ in `/data/master.key`. There is nothing to paste.
 [add-repo-url]: https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmaurorosero%2Fsafe-store
 [add-hacs-badge]: https://my.home-assistant.io/badges/hacs_repository.svg
 [add-hacs-url]: https://my.home-assistant.io/redirect/hacs_repository/?owner=maurorosero&repository=safe-store&category=integration
+
+## The master key
+
+One key protects everything. A few things about it are worth reading twice:
+
+- **Where it lives.** In the app's **Configuration** tab (`master_key`), or in
+  `/data/master.key` when you leave that field empty and let the app generate one.
+- **You see it once.** The app prints it to its log the first time it generates it,
+  with a warning. It is not shown again.
+- **It is not in your backups.** `/data` is excluded from Home Assistant backups on
+  purpose: a backup carrying both the encrypted file and its key would protect
+  nothing. That means a restore brings the encrypted file back **without** the key —
+  and if `master_key` is empty, every integration comes back unreadable.
+- **Keep a copy outside Home Assistant.** A password manager, or a secrets manager
+  such as Infisical. Copy it the moment it appears in the log.
+
+Losing the key is not recoverable here: `safe_store.dump` needs it too. The file on
+disk is not a backup of the key in any sense.
+
+### Getting the key out, and back in
+
+The app has a web interface: Settings → Apps → Safe Store Unlocker → **Open web UI**.
+
+- **Your key.** It shows the fingerprint and a **Download QR** button. That PNG *is* the
+  key: print it, keep it in a safe, or upload it to a secrets manager such as Infisical.
+  You can download it again at any time while the app still holds the key.
+- **Restore from a file.** Upload that PNG. The app reads the QR, writes the key into its
+  own configuration and restarts. Configuration travels in backups, so after restoring
+  once the key no longer lives only in `/data`.
+
+If the page warns that the key has no downloaded copy, that is the one thing to fix
+today: `/data` is not in your backups, and the QR is the only way back.
 
 ## Services
 
@@ -156,6 +189,10 @@ cannot be read with the other.
 **I want to uninstall**
 Run `safe_store.dump` first, confirm `.ss_dump.json` has the credentials, then
 uninstall.
+
+**I lost the master key**
+The file cannot be read by anything, and `dump` needs the key too. The only way
+out is a backup of the key you kept outside Home Assistant.
 
 **I changed the master key**
 There is no rotation yet: the file becomes unreadable. Restore the previous key,
