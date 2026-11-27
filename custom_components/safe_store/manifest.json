@@ -5,6 +5,10 @@
     "@maurorosero"
   ],
   "config_flow": true,
+  "dependencies": [
+    "http",
+    "frontend"
+  ],
   "documentation": "https://github.com/maurorosero/safe-store",
   "integration_type": "service",
   "iot_class": "local_polling",
