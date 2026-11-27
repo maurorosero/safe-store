@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.13] - 2026-11-27
+
+- La pagina del add-on apunta al QR con la ruta completa del Ingress, asi que la descarga entrega la imagen y no la pagina.
+
 ## [0.2.12] - 2026-11-27
 
 - El add-on tiene interfaz web: muestra la huella de la llave, permite descargar el QR para guardarlo y restaura la llave subiendo ese PNG.
