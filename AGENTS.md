@@ -140,12 +140,35 @@ git tag vX.Y.Z && git push --tags
 El workflow de release aborta si el tag no es un merge de `main`, o si
 `manifest.json` y `config.yaml` no dicen la misma versión.
 
+## La documentación viaja con el cambio
+
+Si hay un fragmento de tipo `added`, `changed`, `deprecated` o `removed`, el
+mismo commit tiene que tocar `README.md`, `AGENTS.md`, `CONTRIBUTING.md`,
+`custom_components/safe_store/strings.json` o `secrets_unlocker/config.yaml`.
+Si de verdad no aplica, el fragmento lleva una línea `Docs: none` que no se
+copia al changelog. `tools/changelog.sh guard` lo hace cumplir en CI, y en un PR
+a `main` además falla si `CHANGELOG.md` no cambió.
+
+Un release no empieza por el tag: empieza por el expediente.
+
+```sh
+tools/release-prep.sh v0.2.11   # fragmentos, commits, diff y qué documentos revisar
+tools/changelog.sh prepare 0.2.11
+make check
+git commit -s -m "changelog: 0.2.11"
+```
+
+El expediente existe porque escribir el changelog y actualizar el README de
+memoria es exactamente cómo se pierden un badge o una tabla de estado.
+
 ## Definition of done
 
 - Tests pasan y cubren la lógica nueva.
 - `ruff` y el formato, limpios.
 - SPDX en cada archivo tocado.
 - Fragmento de changelog presente.
+- Documentación actualizada o `Docs: none` en el fragmento.
+- Si el release toca lo que el README describe: badges, número de versión y tabla de estado al día.
 - Si cambia la UI: `strings.json` **y** `translations/en.json`.
 - Si cambia una versión: `manifest.json` **y** `config.yaml`.
 - CI verde en el PR.
