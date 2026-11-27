@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.20] - 2026-11-27
+
+- Las llamadas al Supervisor usan aiohttp: con urllib Home Assistant aborta la peticion por bloquear el event loop.
+
 ## [0.2.19] - 2026-11-27
 
 - La vista usa web.Response: HomeAssistantView no expone self.response, asi que pedir el QR devolvia 500.
