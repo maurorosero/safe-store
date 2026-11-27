@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.11] - 2026-11-27
+
+- El README vuelve a mostrar los badges de CI, version, licencia y HACS, y la tabla de estado dice que esta verificado y que no.
+- Un release ahora empieza por tools/release-prep.sh, y el CI falla si un cambio visible no trae su documentacion.
+
 ## [0.2.10] - 2026-11-26
 
 - Con el archivo cifrado, si el add-on no responde ya no se genera una clave local: la integracion queda en reintento
