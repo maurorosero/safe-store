@@ -56,8 +56,16 @@ def test_la_vista_exige_autenticacion():
     assert paper.PaperView.url == "/api/safe_store/paper"
 
 
-def test_el_js_del_panel_no_pide_sesion():
-    """El panel es solo JavaScript: no lleva secretos y no debe pedir token."""
-    assert paper.PanelView.requires_auth is False
-    assert "safe-store-panel" in paper.JS_PANEL
-    assert "customElements.define" in paper.JS_PANEL
+def test_el_panel_es_un_iframe():
+    """Se probó el panel custom y HA no montaba el elemento: la página quedaba en blanco."""
+    assert paper.PANEL_PATH == "safe-store"
+    assert paper.URL_PAGE.startswith("/api/safe_store/")
+
+
+def test_la_pagina_y_el_estado_tambien_son_solo_admin(monkeypatch):
+    for vista in (paper.StatusView, paper.PageView):
+        assert vista.requires_auth is True
+
+    request = {"hass_user": types.SimpleNamespace(is_admin=False)}
+    assert paper.StatusView._admin(request) is False
+    assert paper.PageView._admin(request) is False
