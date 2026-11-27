@@ -55,44 +55,83 @@ serialised. Integrations are not modified and do not know it exists.
 
 ## Installation
 
-### Companion app
+**The app goes first, the integration second.** The integration does not hold a
+key of its own: it asks the app for one. Installed first, it finds no app,
+creates a key in `/config/.ss.key` and encrypts with that one — and the app,
+installed later, generates a *different* key, after which nothing can be read.
+Every step below assumes that order.
 
-[![Add repository to your instance][add-repo-badge]][add-repo-url]
+### Step 1 · Add the app repository
 
-Settings → Apps → Repositories → add `https://github.com/maurorosero/safe-store`,
-then install **Safe Store Unlocker**.
+1. **Settings → Apps**.
+2. Open the **Repositories** tab, at the top of the page. This is neither the
+   Marketplace nor HACS.
+3. Press **+ Add**, paste `https://github.com/maurorosero/safe-store` and
+   confirm.
+4. The list now shows **Safe Store Apps · Mauro Rosero**.
 
-Then open its **Configuration** tab and paste the master key in `master_key`:
+If that row is not there, the repository was not added and the app will not
+exist in the store. This is the step that gets skipped most often.
 
-```sh
-python3 -c "import os;print(os.urandom(32).hex())"
-```
+### Step 2 · Install and start the app
 
-Leave it empty and the app generates one on the first request, prints it once in
-its log, and keeps it in `/data/master.key`. `/data` is not in Home Assistant
-backups, so a restore brings the file back without the key: paste the value into
-this field and the key travels with the configuration. See
+1. Still in **Apps**, search for **Safe Store Unlocker**.
+2. **Install**, then open it.
+3. Go to the **Configuration** tab and find `master_key`. Paste a key there. To
+   make one:
+
+   ```sh
+   python3 -c "import os;print(os.urandom(32).hex())"
+   ```
+
+4. **Save that string outside Home Assistant now** — a password manager, or
+   Infisical. Without it, a restored backup cannot be decrypted.
+5. **Save**, then **Start**.
+6. Open the **Log** tab. It must say `secrets-unlocker escuchando en :8099`.
+
+Leaving `master_key` empty also works: the app generates one on the first
+request and prints it once in its log, keeping it in `/data/master.key`. But
+`/data` is not in Home Assistant backups, so that key would not come back with a
+restore. Filling the field is the safer path. See
 [The master key](#the-master-key).
 
 For SOPS instead of a plain key, put `age.key` and `secrets.env.enc` (with
 `SAFE_STORE_MASTER_KEY`) in `/data` through the SSH or Samba app. The age
 identity is excluded from backups on purpose.
 
-### Integration
+### Step 3 · Install the integration
 
 [![Add repository to HACS][add-hacs-badge]][add-hacs-url]
 
 1. Open **Marketplace**, accept the warning, then **Add from link** and paste
    `https://github.com/maurorosero/safe-store`.
-2. The Marketplace asks you to connect GitHub first. It hands you a code to
-   enter at `github.com/login/device`; once linked, the repository is added.
+2. Marketplace asks you to connect GitHub first and gives you a code to enter at
+   `github.com/login/device`. Once linked, the repository is added.
 3. Install **Safe Store** and restart Home Assistant.
-4. Settings → Devices & services → **Add integration** → *Safe Store*. Leave
-   the flow empty: the integration finds the app on its own.
+4. **Settings → Devices & services → Add integration → Safe Store.** Leave the
+   form empty: the integration finds the app on its own.
 
-Once the integration is set up it creates `/config/.ss.token` (600) and asks the
-app for the master key. If the app has none yet, it generates one and keeps it
-in `/data/master.key`. There is nothing to paste.
+The integration creates `/config/.ss.token` (600) and asks the app for the key.
+There is nothing to paste here.
+
+### Step 4 · Check it worked
+
+- A **Safe Store** entry appears in the sidebar, for administrators only.
+- It shows a fingerprint and a **Download QR** button.
+- Download that PNG and keep it next to the key from step 2.
+- Entries keep loading: **Settings → Devices & services** should show no
+  integration in *Retry*.
+
+### If you installed the integration first
+
+Your key is now in `/config/.ss.key`, and the app, if it already started, made a
+different one. Fix it before going further:
+
+1. Open `/config/.ss.key` through the SSH or Samba app and copy its contents.
+2. Paste it into the app's `master_key` field.
+3. If the app had already started and wrote `/data/master.key`, delete that file
+   first, or it will keep using its own.
+4. Start the app and restart Home Assistant. Entries should load again.
 
 [ci-badge]: https://github.com/maurorosero/safe-store/actions/workflows/ci.yml/badge.svg?branch=main
 [ci-url]: https://github.com/maurorosero/safe-store/actions/workflows/ci.yml

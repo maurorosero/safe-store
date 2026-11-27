@@ -3,13 +3,17 @@
 
 Vive en el componente y no en el add-on porque acá sí se sabe quién llama:
 `request["hass_user"].is_admin` es la única forma de que el panel sea solo para
-administradores de verdad, y no un panel que cualquiera con sesión puede abrir.
+administradores de verdad.
 
-Las dos mitades:
+El panel es un iframe que apunta a una página servida por esta misma vista. Se
+probó primero con un panel `custom` y un módulo JavaScript, y Home Assistant
+registraba el panel pero nunca montaba el elemento: la página quedaba en blanco.
 
-  GET  /api/safe_store/paper   PNG con el QR de la master key
-  POST /api/safe_store/paper   recibe ese PNG, extrae la llave y la guarda en el
-                               add-on, que es quien la custodia
+  GET  /api/safe_store/status   si hay llave y su huella
+  GET  /api/safe_store/page     la página del panel
+  GET  /api/safe_store/paper    PNG con el QR
+  POST /api/safe_store/paper    recibe ese PNG, extrae la llave y la guarda en
+                                el add-on, que es quien la custodia
 """
 
 from __future__ import annotations
@@ -26,8 +30,9 @@ from homeassistant.core import HomeAssistant
 
 from .const import ADDON_SLUG, SUPERVISOR_URL
 
-URL = "/api/safe_store/paper"
-PANEL_URL = "/safe_store_panel.js"
+URL_PAPER = "/api/safe_store/paper"
+URL_STATUS = "/api/safe_store/status"
+URL_PAGE = "/api/safe_store/page"
 PANEL_PATH = "safe-store"
 
 _clave: bytes | None = None
@@ -128,11 +133,9 @@ async def _supervisor(metodo: str, ruta: str, cuerpo: dict | None = None) -> boo
         return False
 
 
-class PaperView(HomeAssistantView):
-    """Descarga y restauración, solo para administradores."""
+class _AdminView(HomeAssistantView):
+    """Base: toda la superficie de la llave es solo para administradores."""
 
-    url = URL
-    name = "api:safe_store:paper"
     requires_auth = True
 
     @staticmethod
@@ -143,6 +146,23 @@ class PaperView(HomeAssistantView):
         except KeyError:
             return False
         return bool(usuario and usuario.is_admin)
+
+
+class StatusView(_AdminView):
+    url = URL_STATUS
+    name = "api:safe_store:status"
+
+    async def get(self, request):
+        if not self._admin(request):
+            return self.json_message("solo administradores", status_code=403)
+        if _clave is None:
+            return self.json({"tiene_clave": False, "huella": None})
+        return self.json({"tiene_clave": True, "huella": huella(_clave)})
+
+
+class PaperView(_AdminView):
+    url = URL_PAPER
+    name = "api:safe_store:paper"
 
     async def get(self, request):
         if not self._admin(request):
@@ -185,133 +205,121 @@ class PaperView(HomeAssistantView):
         return self.json({"ok": True, "huella": huella(nueva)})
 
 
-class PanelView(HomeAssistantView):
-    """El JavaScript del panel. No lleva secretos: puede servirse sin sesión."""
+PAGINA = """<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Safe Store</title>
+<style>
+ :root { color-scheme: light dark; }
+ body { font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 24px;
+        max-width: 560px; margin-inline: auto; }
+ h1 { font-size: 1.35rem; margin: 0 0 4px; }
+ p.sub { margin: 0 0 24px; opacity: .7; font-size: .9rem; }
+ section { border: 1px solid rgba(128,128,128,.3); border-radius: 12px;
+           padding: 18px; margin-bottom: 18px; }
+ h2 { font-size: 1rem; margin: 0 0 10px; }
+ code { background: rgba(128,128,128,.15); padding: 2px 6px; border-radius: 6px; }
+ .aviso { color: #b3261e; font-weight: 600; }
+ .ok { color: #1b7f3b; font-weight: 600; }
+ a.boton, button { display: inline-block; margin-top: 12px; padding: 10px 16px;
+        border-radius: 9px; border: 0; background: #03a9f4; color: #fff;
+        font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+ input[type=file] { margin-top: 10px; display: block; }
+ #salida { margin-top: 12px; font-size: .9rem; }
+</style>
+<h1>Safe Store</h1>
+<p class="sub">La llave que cifra las credenciales de este Home Assistant.</p>
 
-    url = PANEL_URL
-    name = "api:safe_store:panel"
-    requires_auth = False
+<section>
+ <h2>Tu llave</h2>
+ <p id="linea">Consultando…</p>
+ <a class="boton" href="/api/safe_store/paper" id="bajar" style="display:none">Descargar QR</a>
+</section>
 
-    async def get(self, request):
-        return web.Response(text=JS_PANEL, content_type="text/javascript")
+<section>
+ <h2>Restaurar desde un archivo</h2>
+ <p>Si perdiste la llave o restauraste un backup, subí el PNG que guardaste.</p>
+ <input type="file" id="archivo" accept="image/png">
+ <button id="subir">Restaurar</button>
+ <div id="salida"></div>
+</section>
 
+<script>
+ const linea = document.getElementById('linea');
+ const bajar = document.getElementById('bajar');
+ const salida = document.getElementById('salida');
 
-JS_PANEL = """
-class SafeStorePanel extends HTMLElement {
-  set hass(hass) {
-    this._hass = hass;
-    if (!this._listo) {
-      this._armar();
-      this._listo = true;
-    }
-  }
+ fetch('/api/safe_store/status')
+   .then(r => r.ok ? r.json() : Promise.reject(r.status))
+   .then(d => {
+     if (d.tiene_clave) {
+       linea.innerHTML = 'Huella: <code>' + d.huella + '</code>';
+       bajar.style.display = 'inline-block';
+     } else {
+       linea.textContent = 'Todavía no hay llave: se crea cuando agregás la integración.';
+     }
+   })
+   .catch(e => {
+     linea.className = 'aviso';
+     linea.textContent = e === 403 ? 'Solo administradores.' : 'No pude consultar el estado.';
+   });
 
-  _armar() {
-    this.innerHTML = `
-      <style>
-        .caja { max-width: 560px; margin: 24px auto; font: 16px/1.5 system-ui, sans-serif; }
-        section { border: 1px solid rgba(128,128,128,.3); border-radius: 12px; padding: 18px; margin-bottom: 18px; }
-        h2 { font-size: 1rem; margin: 0 0 10px; }
-        code { background: rgba(128,128,128,.15); padding: 2px 6px; border-radius: 6px; }
-        button, a.boton { display: inline-block; margin-top: 12px; padding: 10px 16px; border-radius: 9px;
-          border: 0; background: #03a9f4; color: #fff; font: inherit; font-weight: 600;
-          text-decoration: none; cursor: pointer; }
-        .aviso { color: #b3261e; font-weight: 600; }
-        .ok { color: #1b7f3b; font-weight: 600; }
-        #salida { margin-top: 12px; font-size: .9rem; }
-      </style>
-      <div class="caja">
-        <h1>Safe Store</h1>
-        <section>
-          <h2>Tu llave</h2>
-          <p>Huella: <code>${'?'}</code></p>
-          <a class="boton" href="#" id="bajar">Descargar QR</a>
-        </section>
-        <section>
-          <h2>Restaurar desde un archivo</h2>
-          <p>Subí el PNG que guardaste. Se lee la llave y queda en el add-on.</p>
-          <input type="file" id="archivo" accept="image/png">
-          <button id="subir">Restaurar</button>
-          <div id="salida"></div>
-        </section>
-      </div>`;
-
-    const token = this._hass.auth.data.access_token;
-    const bajar = this.querySelector('#bajar');
-    const huellaEl = this.querySelector('code');
-    const salida = this.querySelector('#salida');
-
-    fetch('/api/safe_store/paper', { headers: { Authorization: 'Bearer ' + token } })
-      .then(r => r.ok ? r.blob() : Promise.reject(r.status))
-      .then(() => { huellaEl.textContent = 'disponible'; })
-      .catch(e => {
-        huellaEl.textContent = '-';
-        bajar.style.display = 'none';
-        const aviso = document.createElement('p');
-        aviso.className = 'aviso';
-        aviso.textContent = e === 403
-          ? 'Solo administradores.'
-          : 'No hay llave disponible todavía.';
-        huellaEl.parentElement.appendChild(aviso);
-      });
-
-    bajar.addEventListener('click', async (ev) => {
-      ev.preventDefault();
-      const resp = await fetch('/api/safe_store/paper', {
-        headers: { Authorization: 'Bearer ' + token },
-      });
-      if (!resp.ok) { salida.className = 'aviso'; salida.textContent = 'No se pudo bajar.'; return; }
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'safe-store-key.png'; a.click();
-      URL.revokeObjectURL(url);
-    });
-
-    this.querySelector('#subir').addEventListener('click', async () => {
-      const archivo = this.querySelector('#archivo').files[0];
-      if (!archivo) { salida.textContent = 'Elegí un archivo primero.'; return; }
-      salida.className = ''; salida.textContent = 'Leyendo el QR…';
-      try {
-        const resp = await fetch('/api/safe_store/paper', {
-          method: 'POST',
-          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'image/png' },
-          body: archivo,
-        });
-        const datos = await resp.json();
-        if (resp.ok && datos.ok) {
-          salida.className = 'ok';
-          salida.textContent = 'Llave restaurada (' + datos.huella + '). El add-on se reinicia.';
-        } else {
-          salida.className = 'aviso';
-          salida.textContent = datos.message || 'No se pudo restaurar.';
-        }
-      } catch (err) {
-        salida.className = 'aviso';
-        salida.textContent = 'Error: ' + err;
-      }
-    });
-  }
-}
-
-customElements.define('safe-store-panel', SafeStorePanel);
+ document.getElementById('subir').addEventListener('click', async () => {
+   const archivo = document.getElementById('archivo').files[0];
+   if (!archivo) { salida.textContent = 'Elegí un archivo primero.'; return; }
+   salida.className = ''; salida.textContent = 'Leyendo el QR…';
+   try {
+     const resp = await fetch('/api/safe_store/paper', {
+       method: 'POST',
+       headers: { 'Content-Type': 'image/png' },
+       body: archivo,
+     });
+     const datos = await resp.json();
+     if (resp.ok && datos.ok) {
+       salida.className = 'ok';
+       salida.textContent = 'Llave restaurada (' + datos.huella + '). El add-on se reinicia.';
+     } else {
+       salida.className = 'aviso';
+       salida.textContent = datos.message || 'No se pudo restaurar.';
+     }
+   } catch (err) {
+     salida.className = 'aviso';
+     salida.textContent = 'Error: ' + err;
+   }
+ });
+</script>
+</html>
 """
 
 
+class PageView(_AdminView):
+    """La página del panel. Dentro de un iframe del mismo origen, la cookie va sola."""
+
+    url = URL_PAGE
+    name = "api:safe_store:page"
+
+    async def get(self, request):
+        if not self._admin(request):
+            return web.Response(text="solo administradores", status=403)
+        return web.Response(text=PAGINA, content_type="text/html")
+
+
 def async_setup_panel(hass: HomeAssistant, clave: bytes) -> None:
-    """Registra la vista, el JS y el panel lateral solo para administradores."""
+    """Registra las vistas y el panel lateral, solo para administradores."""
     global _clave
     _clave = clave
 
+    hass.http.register_view(StatusView())
     hass.http.register_view(PaperView())
-    hass.http.register_view(PanelView())
+    hass.http.register_view(PageView())
 
     async_register_built_in_panel(
         hass,
-        component_name="custom",
+        component_name="iframe",
         sidebar_title="Safe Store",
         sidebar_icon="mdi:shield-key",
         frontend_url_path=PANEL_PATH,
-        config={"name": "safe-store-panel", "module_url": PANEL_URL},
+        config={"url": URL_PAGE},
         require_admin=True,
     )
