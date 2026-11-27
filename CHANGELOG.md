@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.25] - 2026-11-27
+
+- El add-on no declaraba image, asi que el Supervisor compilaba en el equipo del usuario. Ahora apunta a ghcr.io/maurorosero/safe-store-unlocker, y el release publica tambien el tag sin la v (0.2.25), que es el que el Supervisor busca a partir de la version del config.
+
 ## [0.2.24] - 2026-11-27
 
 - La restauracion escribia la llave en options.json, y las opciones si viajan en el backup: la llave terminaba copiada en cada backup. Ahora se escribe en /data/master.key con 600, se verifica que quedo, y recien despues se vacia la opcion. Al arrancar, una clave que haya llegado por las opciones se mueve al archivo. Cuatro pruebas con un directorio real.

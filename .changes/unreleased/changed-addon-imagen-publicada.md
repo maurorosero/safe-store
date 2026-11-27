@@ -1,1 +1,0 @@
-El add-on no declaraba image, asi que el Supervisor compilaba en el equipo del usuario. Ahora apunta a ghcr.io/maurorosero/safe-store-unlocker, y el release publica tambien el tag sin la v (0.2.25), que es el que el Supervisor busca a partir de la version del config.
