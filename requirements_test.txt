@@ -5,3 +5,5 @@ pytest-cov>=5.0
 pytest-asyncio>=0.23
 ruff>=0.6
 pillow>=10.0
+segno>=1.6
+pyzbar>=0.1.9

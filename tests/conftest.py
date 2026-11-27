@@ -94,16 +94,48 @@ def _sembrar_dobles() -> None:
 
     exceptions.ConfigEntryNotReady = ConfigEntryNotReady
 
+    http = types.ModuleType("homeassistant.components.http")
+
+    class HomeAssistantView:
+        url = ""
+        name = ""
+        requires_auth = True
+
+        @staticmethod
+        def json_message(mensaje, status_code=200):
+            return {"mensaje": mensaje, "status": status_code}
+
+        @staticmethod
+        def json(datos, status_code=200):
+            return datos
+
+        @staticmethod
+        def response(datos, content_type=None, headers=None):
+            return datos
+
+    http.HomeAssistantView = HomeAssistantView
+
+    frontend = types.ModuleType("homeassistant.components.frontend")
+    frontend.async_register_built_in_panel = lambda *a, **k: None
+
+    components = types.ModuleType("homeassistant.components")
+    components.http = http
+    components.frontend = frontend
+
     homeassistant = types.ModuleType("homeassistant")
     homeassistant.core = core
     homeassistant.config_entries = config_entries
     homeassistant.exceptions = exceptions
+    homeassistant.components = components
 
     for nombre, modulo in (
         ("homeassistant", homeassistant),
         ("homeassistant.core", core),
         ("homeassistant.config_entries", config_entries),
         ("homeassistant.exceptions", exceptions),
+        ("homeassistant.components", components),
+        ("homeassistant.components.http", http),
+        ("homeassistant.components.frontend", frontend),
     ):
         sys.modules[nombre] = modulo
 
