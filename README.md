@@ -164,7 +164,7 @@ action: safe_store.dump
 | Web UI: download the key QR | verified inside Home Assistant through Ingress |
 | Restore by uploading the PNG | verified: writes `master_key`, the Supervisor rewrites the file, all entries load |
 | Warning when the key has no downloaded copy | verified |
-| `safe_store.dump` | verified on the POC build, **not re-run on 0.2.10** |
+| `safe_store.dump` | verified: 11 entries in plain text, `600`, while the file stays encrypted |
 | Add-on image | builds, published to ghcr.io |
 | Master key rotation | **not implemented** |
 
