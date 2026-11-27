@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: MIT
 name: Safe Store Unlocker
-version: "0.2.24"
+version: "0.2.25"
 slug: secrets_unlocker
 hostname: secrets-unlocker
 description: Hands the Safe Store master key to Home Assistant over the local network
 url: https://github.com/maurorosero/safe-store
+image: ghcr.io/maurorosero/safe-store-unlocker
 arch:
   - amd64
   - aarch64

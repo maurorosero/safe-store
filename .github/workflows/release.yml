@@ -102,6 +102,7 @@ jobs:
           IMG=ghcr.io/${{ github.repository_owner }}/safe-store-unlocker
           docker buildx imagetools create \
             --tag "${IMG}:${{ github.ref_name }}" \
+            --tag "${IMG}:${GITHUB_REF_NAME#v}" \
             --tag "${IMG}:latest" \
             "${IMG}:${{ github.ref_name }}-amd64" \
             "${IMG}:${{ github.ref_name }}-aarch64"
