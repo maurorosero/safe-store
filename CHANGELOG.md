@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.15] - 2026-11-27
+
+- La tabla de estado del README recoge lo verificado de la interfaz: descarga del QR dentro de Home Assistant, restauracion subiendo el PNG y el aviso cuando la llave no tiene copia.
+
 ## [0.2.14] - 2026-11-27
 
 - Despues de restaurar la llave el add-on se reinicia por el Supervisor, que es quien escribe la configuracion; antes terminaba el proceso y la opcion nueva no entraba en vigor.
