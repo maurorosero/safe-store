@@ -127,17 +127,20 @@ disk is not a backup of the key in any sense.
 
 ### Getting the key out, and back in
 
-The app has a web interface: Settings → Apps → Safe Store Unlocker → **Open web UI**.
+The integration adds a **Safe Store** entry to the sidebar. Only administrators see it,
+and the API behind it checks the same thing on every request.
 
 - **Your key.** It shows the fingerprint and a **Download QR** button. That PNG *is* the
   key: print it, keep it in a safe, or upload it to a secrets manager such as Infisical.
   You can download it again at any time while the app still holds the key.
-- **Restore from a file.** Upload that PNG. The app reads the QR, writes the key into its
-  own configuration and restarts. Configuration travels in backups, so after restoring
-  once the key no longer lives only in `/data`.
+- **Restore from a file.** Upload that PNG. The integration reads the QR, writes the key
+  into the app configuration and restarts it. Configuration travels in backups, so after
+  restoring once the key no longer lives only in `/data`.
 
-If the page warns that the key has no downloaded copy, that is the one thing to fix
-today: `/data` is not in your backups, and the QR is the only way back.
+Why the sidebar and not the app's own web UI: Ingress lets any signed-in user open an
+add-on panel, and the Supervisor has no per-panel role setting. A `HomeAssistantView`
+does know who is calling, so this is the only way to make "administrators only" true
+rather than cosmetic.
 
 ## Services
 
@@ -161,9 +164,8 @@ action: safe_store.dump
 | Full reboot of the machine | verified: 11 of 11 entries `loaded` |
 | Save after a restart | verified: the new entry is written encrypted |
 | App down with the file encrypted | verified: nothing is written, the entry stays in `setup_retry`, no local key is created |
-| Web UI: download the key QR | verified inside Home Assistant through Ingress |
+| Sidebar panel: download the key QR | verified inside Home Assistant, administrators only |
 | Restore by uploading the PNG | verified: writes `master_key`, the Supervisor rewrites the file, all entries load |
-| Warning when the key has no downloaded copy | verified |
 | Unit tests of the shim | verified: encrypt on save, decrypt on load, key lookup, `dump`, and no new key over an encrypted file |
 | `safe_store.dump` | verified: 11 entries in plain text, `600`, while the file stays encrypted |
 | Add-on image | builds, published to ghcr.io |
