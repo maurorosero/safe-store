@@ -5,8 +5,8 @@ versionado [SemVer](https://semver.org/lang/es/).
 
 ## [0.2.11] - 2026-11-27
 
-- El README vuelve a mostrar los badges de CI, version, licencia y HACS, y la tabla de estado dice que esta verificado y que no.
-- Un release ahora empieza por tools/release-prep.sh, y el CI falla si un cambio visible no trae su documentacion.
+- El README vuelve a mostrar los badges de CI, versión, licencia y HACS, y la tabla de estado dice qué está verificado y qué no.
+- Un release ahora empieza por `tools/release-prep.sh`, y el CI falla si un cambio visible no trae su documentación.
 
 ## [0.2.10] - 2026-11-26
 
