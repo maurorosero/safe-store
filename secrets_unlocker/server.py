@@ -19,6 +19,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -157,6 +158,28 @@ def _guardar_clave(clave: str) -> bool:
     except (urllib.error.URLError, OSError, ValueError) as err:
         print(f"no pude guardar la opción: {err}", file=sys.stderr)
         return False
+
+
+def _reiniciar() -> None:
+    """Le pide al Supervisor que reinicie el add-on.
+
+    No alcanza con terminar el proceso: s6 lo levanta de nuevo dentro del mismo
+    contenedor y /data/options.json no se reescribe. El Supervisor sí lo hace al
+    recrear el contenedor, y ahí la opción nueva entra en vigor.
+    """
+    token = os.environ.get("SUPERVISOR_TOKEN", "")
+    if not token:
+        return
+    peticion = urllib.request.Request(
+        f"{SUPERVISOR}/addons/self/restart",
+        data=b"",
+        method="POST",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    try:
+        urllib.request.urlopen(peticion, timeout=15).close()
+    except (urllib.error.URLError, OSError, ValueError) as err:
+        print(f"no pude reiniciar: {err}", file=sys.stderr)
 
 
 def _decodificar(png: bytes) -> str | None:
@@ -320,7 +343,8 @@ class Handler(BaseHTTPRequestHandler):
                 flush=True,
             )
             self._responder(200, {"ok": True, "huella": _huella(clave)})
-            os._exit(0)  # s6 lo vuelve a levantar, ya con la opción nueva
+            # El reinicio va después de contestar, o el navegador ve un error.
+            threading.Timer(1.5, _reiniciar).start()
             return
 
         self._responder(404, {"error": "not found"})
