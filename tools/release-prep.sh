@@ -87,7 +87,7 @@ fi
 	echo "3. Revisar la tabla de estado del README: cada fila dice verificado o no, y una fila"
 	echo "   nueva sin evidencia no se escribe."
 	echo "4. \`tools/changelog.sh prepare v${version}\` para ensamblar la sección."
-	echo "5. \`make check\`, commit firmado."
+	echo "5. \`tools/check.sh\`, commit firmado."
 } >"${salida}"
 
 cat "${salida}"

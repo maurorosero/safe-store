@@ -34,8 +34,8 @@ tools/hooks/dco.sh origin/devs                       # firmas en los commits
 tools/changelog.sh prepare X.Y.Z                     # sección de release
 ```
 
-No hay `make`. El proyecto no compila binarios: la validación pesada la hacen
-`hassfest` y la acción de HACS en el CI.
+No hay `make`. La validación local es un script: `tools/check.sh`. La pesada la
+hacen `hassfest` y la acción de HACS en el CI.
 
 ## Code style
 
@@ -154,7 +154,7 @@ Un release no empieza por el tag: empieza por el expediente.
 ```sh
 tools/release-prep.sh v0.2.11   # fragmentos, commits, diff y qué documentos revisar
 tools/changelog.sh prepare 0.2.11
-make check
+tools/check.sh
 git commit -s -m "changelog: 0.2.11"
 ```
 
