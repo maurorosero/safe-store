@@ -76,9 +76,17 @@ identity is excluded from backups on purpose.
 
 [![Add repository to HACS][add-hacs-badge]][add-hacs-url]
 
-1. Marketplace → Repositories → add `https://github.com/maurorosero/safe-store`.
-2. Install **Safe Store** and restart Home Assistant.
-3. Settings → Devices & services → **Add integration** → *Safe Store*.
+1. Open **Marketplace**, accept the warning, then **Add from link** and paste
+   `https://github.com/maurorosero/safe-store`.
+2. The Marketplace asks you to connect GitHub first. It hands you a code to
+   enter at `github.com/login/device`; once linked, the repository is added.
+3. Install **Safe Store** and restart Home Assistant.
+4. Settings → Devices & services → **Add integration** → *Safe Store*. Leave
+   the flow empty: the integration finds the app on its own.
+
+Once the integration is set up it creates `/config/.ss.token` (600) and asks the
+app for the master key. If the app has none yet, it generates one and keeps it
+in `/data/master.key`. There is nothing to paste.
 
 [add-repo-badge]: https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg
 [add-repo-url]: https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmaurorosero%2Fsafe-store
@@ -105,7 +113,8 @@ action: safe_store.dump
 | `safe_store.dump` | verified |
 | Restarts with encrypted file | verified |
 | Add-on image | builds, published to ghcr.io |
-| Integration ↔ add-on over HTTP | **not exercised** |
+| Integration ↔ add-on over HTTP | verified: 10 entries `loaded` after a restart |
+| Fresh install from the repository, no manual steps | verified on a clean HAOS 18.4 |
 | Master key rotation | **not implemented** |
 
 If the app is unavailable and the file is encrypted, Safe Store **writes
@@ -125,7 +134,9 @@ would corrupt every integration at once.
 
 **Integrations stuck in `setup_retry` after boot**
 The app is not delivering the key. Check Settings → Apps → Safe Store Unlocker →
-Log.
+Log. `/config/.ss.key` appearing means the integration fell back to a local key:
+that file and the one in the app are not the same, so a file encrypted with one
+cannot be read with the other.
 
 **I want to uninstall**
 Run `safe_store.dump` first, confirm `.ss_dump.json` has the credentials, then
