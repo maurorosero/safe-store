@@ -8,7 +8,7 @@ ARG TARGETARCH=amd64
 ARG SOPS_VERSION=3.9.4
 ARG AGE_VERSION=1.2.0
 
-RUN apk add --no-cache python3 curl \
+RUN apk add --no-cache python3 curl py3-qrcode py3-pillow py3-pyzbar libzbar \
     && case "${TARGETARCH}" in \
          amd64) sops_arch=amd64; age_arch=linux-amd64 ;; \
          arm64) sops_arch=arm64; age_arch=linux-arm64 ;; \
