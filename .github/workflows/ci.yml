@@ -141,5 +141,8 @@ jobs:
           fetch-depth: 0
       - name: fragmentos
         run: |
-          git fetch --no-tags origin "${{ github.base_ref }}"
           tools/changelog.sh check
+      - name: documentación
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          tools/changelog.sh guard "${{ github.base_ref }}"
