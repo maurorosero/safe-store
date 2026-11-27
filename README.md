@@ -2,6 +2,11 @@
 
 ![Safe Store](assets/banner.png)
 
+[![CI][ci-badge]][ci-url]
+[![Release][release-badge]][release-url]
+[![License][license-badge]][license-url]
+[![HACS Custom][hacs-badge]][hacs-url]
+
 An encryption layer for the credentials of Home Assistant integrations.
 
 Home Assistant keeps every integration password and API token in plain text
@@ -12,12 +17,12 @@ unassigned and uncommented. Core protects `.storage/auth` with `0600` and leaves
 `core.config_entries` at `0644`: the file that holds the credentials is the one
 with the loosest permissions.
 
-**Status: 0.2.0, pre-release.** The integration is verified end to end on Home
-Assistant OS 18.4 (core 2026.11): it encrypts on save, decrypts at startup,
-reloads the affected entries, survives restarts, and `safe_store.dump` restores
-plaintext for uninstalling. The companion app is published and builds; the
-full path — integration asking the app for the key over HTTP — **has not been
-exercised yet**. See [Status](#status) below.
+**Status: 0.2.11.** Installed from this repository on a clean Home Assistant OS
+18.4 (core 2026.11) with no manual steps: the app generates the master key, the
+integration asks for it over HTTP, and 11 entries came back `loaded` after a
+full reboot of the machine. With the app down and the file encrypted, it writes
+nothing and stays in `setup_retry` instead of falling back to a new key. See
+[Status](#status) for what is and is not exercised.
 
 ## What it does
 
@@ -88,6 +93,14 @@ Once the integration is set up it creates `/config/.ss.token` (600) and asks the
 app for the master key. If the app has none yet, it generates one and keeps it
 in `/data/master.key`. There is nothing to paste.
 
+[ci-badge]: https://github.com/maurorosero/safe-store/actions/workflows/ci.yml/badge.svg?branch=main
+[ci-url]: https://github.com/maurorosero/safe-store/actions/workflows/ci.yml
+[release-badge]: https://img.shields.io/github/v/release/maurorosero/safe-store
+[release-url]: https://github.com/maurorosero/safe-store/releases
+[license-badge]: https://img.shields.io/github/license/maurorosero/safe-store
+[license-url]: LICENSE
+[hacs-badge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg
+[hacs-url]: https://github.com/hacs/integration
 [add-repo-badge]: https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg
 [add-repo-url]: https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmaurorosero%2Fsafe-store
 [add-hacs-badge]: https://my.home-assistant.io/badges/hacs_repository.svg
@@ -110,11 +123,13 @@ action: safe_store.dump
 | Piece | State |
 |---|---|
 | Encryption, decryption, reload | verified on HAOS 18.4 / core 2026.11 |
-| `safe_store.dump` | verified |
-| Restarts with encrypted file | verified |
-| Add-on image | builds, published to ghcr.io |
-| Integration ↔ add-on over HTTP | verified: 10 entries `loaded` after a restart |
+| Integration ↔ add-on over HTTP | verified: the app generates the key, the integration fetches it |
 | Fresh install from the repository, no manual steps | verified on a clean HAOS 18.4 |
+| Full reboot of the machine | verified: 11 of 11 entries `loaded` |
+| Save after a restart | verified: the new entry is written encrypted |
+| App down with the file encrypted | verified: nothing is written, the entry stays in `setup_retry`, no local key is created |
+| `safe_store.dump` | verified on the POC build, **not re-run on 0.2.10** |
+| Add-on image | builds, published to ghcr.io |
 | Master key rotation | **not implemented** |
 
 If the app is unavailable and the file is encrypted, Safe Store **writes
