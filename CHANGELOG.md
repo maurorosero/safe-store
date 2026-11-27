@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.19] - 2026-11-27
+
+- La vista usa web.Response: HomeAssistantView no expone self.response, asi que pedir el QR devolvia 500.
+
 ## [0.2.18] - 2026-11-27
 
 - La interfaz de la llave pasa al componente como panel lateral de Home Assistant, visible solo para administradores; el add-on queda solo custodiando la llave.
