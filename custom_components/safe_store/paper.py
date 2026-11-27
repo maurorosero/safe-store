@@ -16,10 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import io
-import json
 import os
-import urllib.error
-import urllib.request
 
 import aiohttp
 from aiohttp import web
@@ -110,21 +107,24 @@ async def _slug_addon() -> str | None:
 
 
 async def _supervisor(metodo: str, ruta: str, cuerpo: dict | None = None) -> bool:
-    """Llama al Supervisor con el token del core."""
+    """Llama al Supervisor con el token del core.
+
+    Con aiohttp y no con urllib: Home Assistant aborta cualquier llamada
+    bloqueante dentro del event loop.
+    """
     token = os.environ.get("SUPERVISOR_TOKEN")
     if not token:
         return False
-    datos = json.dumps(cuerpo).encode() if cuerpo is not None else b""
-    peticion = urllib.request.Request(
-        f"{SUPERVISOR_URL}{ruta}",
-        data=datos,
-        method=metodo,
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-    )
+    cabeceras = {"Authorization": f"Bearer {token}"}
     try:
-        with urllib.request.urlopen(peticion, timeout=20) as resp:
+        async with (
+            aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=20), headers=cabeceras
+            ) as sesion,
+            sesion.request(metodo, f"{SUPERVISOR_URL}{ruta}", json=cuerpo) as resp,
+        ):
             return resp.status == 200
-    except (urllib.error.URLError, OSError, ValueError):
+    except (aiohttp.ClientError, TimeoutError, ValueError):
         return False
 
 
